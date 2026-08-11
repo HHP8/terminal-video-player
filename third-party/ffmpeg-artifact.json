@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "distributor": "BtbN/FFmpeg-Builds",
+  "release": "autobuild-2026-06-30-13-34",
+  "release_id": 346858151,
+  "asset": "ffmpeg-n8.1.2-21-gce3c09c101-win64-lgpl-shared-8.1.zip",
+  "asset_id": 462189263,
+  "asset_url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-30-13-34/ffmpeg-n8.1.2-21-gce3c09c101-win64-lgpl-shared-8.1.zip",
+  "size_bytes": 70103338,
+  "sha256": "27bcaf58b5140171dfe838a0b365d12c60607d71fc168424456410bad6a834da",
+  "runtime_version_token": "n8.1.2-21-gce3c09c101-20260630",
+  "build_repository_commit": "7a83528ea3431e9eca982a712bc3a7cd0789d5d0",
+  "ffmpeg_source_commit": "ce3c09c101c83add623774d414a9f9498caf5c25",
+  "ffmpeg_source_url": "https://github.com/FFmpeg/FFmpeg/archive/ce3c09c101c83add623774d414a9f9498caf5c25.tar.gz",
+  "expected_flags": [
+    "--enable-version3",
+    "--enable-shared",
+    "--disable-static"
+  ],
+  "rejected_flags": [
+    "--enable-gpl",
+    "--enable-nonfree"
+  ],
+  "expected_license_posture": "LGPL-3.0-or-later",
+  "license_files": [
+    {
+      "name": "FFmpeg-LICENSE.md",
+      "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/ce3c09c101c83add623774d414a9f9498caf5c25/LICENSE.md",
+      "sha256": "2e1d16c72fd74e12063776371da757322f8b77589386532f4fd8634bde7de1af"
+    },
+    {
+      "name": "FFmpeg-COPYING.LGPLv3",
+      "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/ce3c09c101c83add623774d414a9f9498caf5c25/COPYING.LGPLv3",
+      "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768"
+    },
+    {
+      "name": "FFmpeg-COPYING.GPLv3",
+      "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/ce3c09c101c83add623774d414a9f9498caf5c25/COPYING.GPLv3",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+    }
+  ],
+  "release_is_immutable": false,
+  "redistribution_review_required": true
+}
