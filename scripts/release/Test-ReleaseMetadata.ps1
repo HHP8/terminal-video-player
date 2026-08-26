@@ -118,10 +118,13 @@ foreach ($License in @($Metadata.toolchain.licenses)) {
     if ([string]::IsNullOrWhiteSpace($License.component) -or
         [string]::IsNullOrWhiteSpace($License.spdx) -or
         [string]::IsNullOrWhiteSpace($License.source) -or
+        [string]::IsNullOrWhiteSpace($License.source_commit) -or
         [string]::IsNullOrWhiteSpace($License.artifact_path) -or
         [string]::IsNullOrWhiteSpace($License.output_name)) {
-        throw 'Every toolchain license entry must contain component, spdx, source, artifact_path, and output_name.'
+        throw 'Every toolchain license entry must contain component, spdx, source, source_commit, artifact_path, and output_name.'
     }
+    Assert-Commit $License.source_commit "Toolchain component source commit for $($License.component)"
+    Assert-ImmutableUrl $License.source $License.source_commit "Toolchain component source URL for $($License.component)"
 }
 
 Assert-SortedUniqueStrings @($Metadata.build.configuration_flags) 'FFmpeg configuration flags'
