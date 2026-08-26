@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "libraries": ["avcodec", "avdevice", "avfilter", "avformat", "avutil", "swresample", "swscale"],
+  "protocols": ["file", "pipe"],
+  "demuxers": ["avi", "flac", "matroska", "mov", "mp3", "mpegts", "ogg", "wav"],
+  "decoders": ["aac", "av1", "flac", "h264", "hevc", "mp3", "mp3float", "mpeg4", "opus", "pcm_s16le", "vorbis", "vp8", "vp9"],
+  "parsers": ["aac", "av1", "flac", "h264", "hevc", "mpeg4video", "mpegaudio", "opus", "vorbis", "vp8", "vp9"],
+  "encoders": ["aac", "mpeg4", "pcm_s16le", "rawvideo"],
+  "muxers": ["mov", "rawvideo", "s16le"],
+  "filters": ["aevalsrc", "aformat", "aresample", "color", "drawbox", "format", "fps", "scale", "setpts"],
+  "indevs": ["lavfi"],
+  "allowed_pe_imports": [
+    "ADVAPI32.dll",
+    "api-ms-win-crt-convert-l1-1-0.dll",
+    "api-ms-win-crt-environment-l1-1-0.dll",
+    "api-ms-win-crt-filesystem-l1-1-0.dll",
+    "api-ms-win-crt-heap-l1-1-0.dll",
+    "api-ms-win-crt-locale-l1-1-0.dll",
+    "api-ms-win-crt-math-l1-1-0.dll",
+    "api-ms-win-crt-runtime-l1-1-0.dll",
+    "api-ms-win-crt-stdio-l1-1-0.dll",
+    "api-ms-win-crt-string-l1-1-0.dll",
+    "api-ms-win-crt-time-l1-1-0.dll",
+    "api-ms-win-crt-utility-l1-1-0.dll",
+    "bcrypt.dll",
+    "KERNEL32.dll",
+    "ole32.dll",
+    "SHELL32.dll",
+    "USER32.dll"
+  ]
+}

@@ -1,44 +1,119 @@
 {
-  "schema": 1,
-  "distributor": "BtbN/FFmpeg-Builds",
-  "release": "autobuild-2026-06-30-13-34",
-  "release_id": 346858151,
-  "asset": "ffmpeg-n8.1.2-21-gce3c09c101-win64-lgpl-shared-8.1.zip",
-  "asset_id": 462189263,
-  "asset_url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-30-13-34/ffmpeg-n8.1.2-21-gce3c09c101-win64-lgpl-shared-8.1.zip",
-  "size_bytes": 70103338,
-  "sha256": "27bcaf58b5140171dfe838a0b365d12c60607d71fc168424456410bad6a834da",
-  "runtime_version_token": "n8.1.2-21-gce3c09c101-20260630",
-  "build_repository_commit": "7a83528ea3431e9eca982a712bc3a7cd0789d5d0",
-  "ffmpeg_source_commit": "ce3c09c101c83add623774d414a9f9498caf5c25",
-  "ffmpeg_source_url": "https://github.com/FFmpeg/FFmpeg/archive/ce3c09c101c83add623774d414a9f9498caf5c25.tar.gz",
-  "expected_flags": [
-    "--enable-version3",
-    "--enable-shared",
-    "--disable-static"
-  ],
-  "rejected_flags": [
-    "--enable-gpl",
-    "--enable-nonfree"
-  ],
-  "expected_license_posture": "LGPL-3.0-or-later",
-  "license_files": [
-    {
-      "name": "FFmpeg-LICENSE.md",
-      "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/ce3c09c101c83add623774d414a9f9498caf5c25/LICENSE.md",
-      "sha256": "2e1d16c72fd74e12063776371da757322f8b77589386532f4fd8634bde7de1af"
+  "schema": 2,
+  "ffmpeg": {
+    "project": "FFmpeg",
+    "version": "9.0.1",
+    "release_tag": "n9.0.1",
+    "source_commit": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+    "source_archive": {
+      "name": "ffmpeg-9.0.1.tar.xz",
+      "url": "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz",
+      "size_bytes": 12036420,
+      "sha256": "cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635"
     },
-    {
-      "name": "FFmpeg-COPYING.LGPLv3",
-      "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/ce3c09c101c83add623774d414a9f9498caf5c25/COPYING.LGPLv3",
-      "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768"
+    "source_signature": {
+      "name": "ffmpeg-9.0.1.tar.xz.asc",
+      "url": "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz.asc",
+      "size_bytes": 520,
+      "sha256": "b613a00005232a1245ace7080088781ac23a916119d3e5b0d6c042368eee0177"
     },
-    {
-      "name": "FFmpeg-COPYING.GPLv3",
-      "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/ce3c09c101c83add623774d414a9f9498caf5c25/COPYING.GPLv3",
-      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
-    }
-  ],
-  "release_is_immutable": false,
-  "redistribution_review_required": true
+    "signing_key": {
+      "path": "third-party/ffmpeg-release-signing-key.asc",
+      "provenance_url": "https://ffmpeg.org/ffmpeg-devel.asc",
+      "fingerprint": "FCF986EA15E6E293A5644F10B4322F04D67658D8",
+      "sha256": "397b3becedcd5a98769967ff1ff8501ddc89f8368b8f766e4701377d7dbaabe5"
+    },
+    "expected_license": "LGPL-2.1-or-later",
+    "rejected_flags": [
+      "--enable-gpl",
+      "--enable-nonfree",
+      "--enable-version3"
+    ],
+    "rejected_configuration_terms": [
+      "--enable-cuda",
+      "--enable-lib",
+      "--enable-nvenc",
+      "--enable-opencl",
+      "--enable-openssl",
+      "--enable-schannel",
+      "--enable-vulkan"
+    ]
+  },
+  "toolchain": {
+    "project": "mstorsjo/llvm-mingw",
+    "release": "20260616",
+    "source_commit": "170b7e1ec4ad1d9264e6ba320cd4d02f96299c60",
+    "llvm_version": "22.1.8",
+    "artifact": {
+      "name": "llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64.tar.xz",
+      "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20260616/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64.tar.xz",
+      "size_bytes": 82188288,
+      "sha256": "534b92e067b22a6b4441f48ae9240a3341b17825d04d577eab0cf85c44b4deda"
+    },
+    "target": "x86_64-w64-mingw32",
+    "crt": "ucrt",
+    "licenses": [
+      {
+        "component": "LLVM, Clang, LLD, and compiler-rt",
+        "spdx": "Apache-2.0 WITH LLVM-exception",
+        "source": "https://github.com/llvm/llvm-project/tree/llvmorg-22.1.8"
+      },
+      {
+        "component": "mingw-w64 headers and runtime",
+        "spdx": "LicenseRef-mingw-w64-runtime",
+        "source": "https://github.com/mingw-w64/mingw-w64"
+      }
+    ]
+  },
+  "build": {
+    "host_runner": "ubuntu-24.04",
+    "validation_runner": "windows-2025",
+    "target_os": "mingw32",
+    "architecture": "x86_64",
+    "configuration_flags": [
+      "--disable-autodetect",
+      "--disable-debug",
+      "--disable-doc",
+      "--disable-everything",
+      "--disable-network",
+      "--disable-shared",
+      "--disable-x86asm",
+      "--enable-ffmpeg",
+      "--enable-ffprobe",
+      "--enable-small",
+      "--enable-static"
+    ],
+    "source_date_epoch": "tagged-commit-timestamp",
+    "locale": "C",
+    "timezone": "UTC"
+  },
+  "package": {
+    "runtime_files": [
+      "LICENSE",
+      "licenses/FFmpeg/COPYING.LGPLv2.1",
+      "licenses/FFmpeg/LICENSE.md",
+      "manifest/PACKAGE-MANIFEST.json",
+      "manifest/SHA256SUMS",
+      "provenance/FFMPEG-BUILDCONF.txt",
+      "provenance/FFMPEG-COMPONENTS.json",
+      "provenance/FFMPEG-LICENSE.txt",
+      "provenance/FFMPEG-PE-IMPORTS.json",
+      "provenance/FFMPEG-VERSION.txt",
+      "provenance/PROVENANCE.json",
+      "README-PORTABLE.md",
+      "terminal-video-player.exe",
+      "THIRD-PARTY-NOTICES.md",
+      "tools/ffmpeg/ffmpeg.exe",
+      "tools/ffmpeg/ffprobe.exe"
+    ],
+    "published_asset_suffixes": [
+      "-ffmpeg-corresponding-source.zip",
+      "-ffmpeg-corresponding-source.zip.sha256",
+      "-manifest.json",
+      "-portable-windows-x86_64.zip",
+      "-portable-windows-x86_64.zip.sha256",
+      "-provenance.json",
+      "-sbom.spdx.json"
+    ]
+  }
 }
