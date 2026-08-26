@@ -59,4 +59,12 @@ foreach ($RequiredTerm in @(
     }
 }
 
+$FixtureGenerator = Get-Content -LiteralPath (Join-Path $RepoRoot 'scripts\Generate-TestMedia.ps1') -Raw
+if ($FixtureGenerator.Contains('libopenh264', [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Test-media generation must not require the external libopenh264 encoder.'
+}
+if (-not $FixtureGenerator.Contains('-c:v mpeg4', [StringComparison]::Ordinal)) {
+    throw 'Test-media generation must use the reviewed native MPEG-4 encoder.'
+}
+
 Write-Host 'FFmpeg build-policy validation passed.'

@@ -18,7 +18,7 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 }
 $Ffmpeg = Join-Path $FfmpegDirectory 'ffmpeg.exe'
 if (-not (Test-Path -LiteralPath $Ffmpeg -PathType Leaf)) {
-    throw "Pinned ffmpeg.exe not found at $Ffmpeg. Run .\scripts\Fetch-Ffmpeg.ps1 first."
+    throw "Compatible ffmpeg.exe not found at $Ffmpeg. Provide the verified source-built tools."
 }
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
@@ -30,7 +30,7 @@ $audioExpression = "if(lt(mod(t\,1)\,0.05)\,0.8*sin(2*PI*1000*t)\,0)"
     -f lavfi -i "color=c=black:s=${Resolution}:r=30:d=$DurationSeconds" `
     -f lavfi -i "aevalsrc=${audioExpression}:s=48000:d=$DurationSeconds" `
     -vf $videoFilter `
-    -c:v libopenh264 -b:v 2M -pix_fmt yuv420p `
+    -c:v mpeg4 -q:v 5 -pix_fmt yuv420p `
     -c:a aac -ar 48000 -ac 2 -shortest `
     $Output
 if ($LASTEXITCODE -ne 0) {

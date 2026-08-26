@@ -49,4 +49,14 @@ if ($LASTEXITCODE -ne 0 -or $KeyEol -notmatch ': eol: lf$') {
     throw 'The vendored FFmpeg signing key must be checked out with LF line endings.'
 }
 
+$ProbeSource = Get-Content -LiteralPath (Join-Path $RepoRoot 'src\media\probe.rs') -Raw
+foreach ($RequiredField in @('ffmpeg: FfmpegIdentity', 'build: FfmpegBuildPolicy', 'rejected_configuration_terms')) {
+    if (-not $ProbeSource.Contains($RequiredField, [StringComparison]::Ordinal)) {
+        throw "Rust runtime validation is not coupled to schema-2 release metadata: $RequiredField"
+    }
+}
+if ($ProbeSource.Contains('runtime_version_token:', [StringComparison]::Ordinal)) {
+    throw 'Rust runtime validation still depends on the removed prebuilt-provider version token.'
+}
+
 Write-Host 'Release metadata validation passed.'

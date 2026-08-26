@@ -14,9 +14,20 @@ const FFMPEG_ARTIFACT_MANIFEST: &str = include_str!("../../third-party/ffmpeg-ar
 
 #[derive(Debug, Deserialize)]
 struct FfmpegArtifactManifest {
-    runtime_version_token: String,
-    expected_flags: Vec<String>,
+    ffmpeg: FfmpegIdentity,
+    build: FfmpegBuildPolicy,
+}
+
+#[derive(Debug, Deserialize)]
+struct FfmpegIdentity {
+    version: String,
     rejected_flags: Vec<String>,
+    rejected_configuration_terms: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct FfmpegBuildPolicy {
+    configuration_flags: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -91,20 +102,22 @@ impl FfmpegPaths {
         let ffprobe_text = String::from_utf8_lossy(&ffprobe_version.stdout);
         let manifest: FfmpegArtifactManifest = serde_json::from_str(FFMPEG_ARTIFACT_MANIFEST)
             .context("parsing embedded FFmpeg artifact manifest")?;
-        if !ffmpeg_text.contains(&manifest.runtime_version_token)
-            || !ffprobe_text.contains(&manifest.runtime_version_token)
+        let expected_version = format!("ffmpeg version {}", manifest.ffmpeg.version);
+        if !ffmpeg_text.contains(&expected_version) || !ffprobe_text.contains(&expected_version)
         {
             anyhow::bail!(
                 "FFmpeg version mismatch; expected {}. Install the supported build or pass the matching --ffmpeg-dir",
-                manifest.runtime_version_token
+                manifest.ffmpeg.version
             );
         }
         let mut build_text = String::from_utf8_lossy(&build.stdout).into_owned();
         build_text.push_str(&String::from_utf8_lossy(&build.stderr));
+        let mut rejected = manifest.ffmpeg.rejected_flags;
+        rejected.extend(manifest.ffmpeg.rejected_configuration_terms);
         validate_build_configuration(
             &build_text,
-            &manifest.expected_flags,
-            &manifest.rejected_flags,
+            &manifest.build.configuration_flags,
+            &rejected,
         )
     }
 }
@@ -325,25 +338,29 @@ mod tests {
     fn validates_expected_license_flags() {
         let manifest: FfmpegArtifactManifest =
             serde_json::from_str(FFMPEG_ARTIFACT_MANIFEST).expect("embedded manifest");
+        let valid_configuration = manifest.build.configuration_flags.join(" ");
+        let mut rejected = manifest.ffmpeg.rejected_flags.clone();
+        rejected.extend(manifest.ffmpeg.rejected_configuration_terms.clone());
         validate_build_configuration(
-            "--enable-version3 --enable-shared --disable-static --disable-libx264",
-            &manifest.expected_flags,
-            &manifest.rejected_flags,
+            &valid_configuration,
+            &manifest.build.configuration_flags,
+            &rejected,
         )
-        .expect("valid LGPL configuration");
+        .expect("valid minimal LGPL configuration");
         assert!(
             validate_build_configuration(
-                "--enable-version3 --enable-shared --disable-static --enable-gpl",
-                &manifest.expected_flags,
-                &manifest.rejected_flags,
+                &format!("{valid_configuration} --enable-gpl"),
+                &manifest.build.configuration_flags,
+                &rejected,
             )
             .is_err()
         );
+        let incomplete_configuration = valid_configuration.replace("--enable-static", "");
         assert!(
             validate_build_configuration(
-                "--enable-shared --disable-static",
-                &manifest.expected_flags,
-                &manifest.rejected_flags,
+                &incomplete_configuration,
+                &manifest.build.configuration_flags,
+                &rejected,
             )
             .is_err()
         );
