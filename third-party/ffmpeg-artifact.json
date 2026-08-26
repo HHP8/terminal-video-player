@@ -56,12 +56,23 @@
       {
         "component": "LLVM, Clang, LLD, and compiler-rt",
         "spdx": "Apache-2.0 WITH LLVM-exception",
-        "source": "https://github.com/llvm/llvm-project/tree/llvmorg-22.1.8"
+        "source": "https://github.com/llvm/llvm-project/tree/llvmorg-22.1.8",
+        "artifact_path": "LICENSE.TXT",
+        "output_name": "LLVM-LICENSE.txt"
       },
       {
-        "component": "mingw-w64 headers and runtime",
+        "component": "mingw-w64 headers and startup code",
+        "spdx": "ZPL-2.1",
+        "source": "https://github.com/mingw-w64/mingw-w64",
+        "artifact_path": "x86_64-w64-mingw32/share/mingw32/COPYING",
+        "output_name": "MINGW-W64-COPYING.txt"
+      },
+      {
+        "component": "mingw-w64 runtime license collection",
         "spdx": "LicenseRef-mingw-w64-runtime",
-        "source": "https://github.com/mingw-w64/mingw-w64"
+        "source": "https://github.com/mingw-w64/mingw-w64",
+        "artifact_path": "x86_64-w64-mingw32/share/mingw32/COPYING.MinGW-w64-runtime.txt",
+        "output_name": "MINGW-W64-RUNTIME.txt"
       }
     ]
   },
@@ -92,6 +103,9 @@
       "LICENSE",
       "licenses/FFmpeg/COPYING.LGPLv2.1",
       "licenses/FFmpeg/LICENSE.md",
+      "licenses/Toolchain/LLVM-LICENSE.txt",
+      "licenses/Toolchain/MINGW-W64-COPYING.txt",
+      "licenses/Toolchain/MINGW-W64-RUNTIME.txt",
       "manifest/PACKAGE-MANIFEST.json",
       "manifest/SHA256SUMS",
       "provenance/FFMPEG-BUILDCONF.txt",

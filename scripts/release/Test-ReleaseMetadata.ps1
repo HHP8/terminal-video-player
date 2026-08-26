@@ -117,8 +117,10 @@ Assert-Sha256 $Metadata.toolchain.artifact.sha256 'Toolchain hash'
 foreach ($License in @($Metadata.toolchain.licenses)) {
     if ([string]::IsNullOrWhiteSpace($License.component) -or
         [string]::IsNullOrWhiteSpace($License.spdx) -or
-        [string]::IsNullOrWhiteSpace($License.source)) {
-        throw 'Every toolchain license entry must contain component, spdx, and source.'
+        [string]::IsNullOrWhiteSpace($License.source) -or
+        [string]::IsNullOrWhiteSpace($License.artifact_path) -or
+        [string]::IsNullOrWhiteSpace($License.output_name)) {
+        throw 'Every toolchain license entry must contain component, spdx, source, artifact_path, and output_name.'
     }
 }
 

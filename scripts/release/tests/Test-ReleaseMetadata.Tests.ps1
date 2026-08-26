@@ -29,6 +29,20 @@ foreach ($Flag in @('--enable-gpl', '--enable-nonfree', '--enable-version3')) {
         throw "Rejected FFmpeg flag is missing: $Flag"
     }
 }
+foreach ($LicensePath in @(
+    'licenses/Toolchain/LLVM-LICENSE.txt',
+    'licenses/Toolchain/MINGW-W64-COPYING.txt',
+    'licenses/Toolchain/MINGW-W64-RUNTIME.txt'
+)) {
+    if ($LicensePath -notin @($Metadata.package.runtime_files)) {
+        throw "Required incorporated-toolchain notice is missing from the package allowlist: $LicensePath"
+    }
+}
+foreach ($License in @($Metadata.toolchain.licenses)) {
+    if ([string]::IsNullOrWhiteSpace($License.artifact_path)) {
+        throw "Toolchain license entry is missing artifact_path: $($License.component)"
+    }
+}
 
 $KeyEol = git -C $RepoRoot check-attr eol -- third-party/ffmpeg-release-signing-key.asc
 if ($LASTEXITCODE -ne 0 -or $KeyEol -notmatch ': eol: lf$') {
