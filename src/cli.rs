@@ -91,7 +91,7 @@ pub struct Cli {
 pub enum Command {
     /// Emit best-effort VT reset sequences and restore cooked input mode.
     RestoreTerminal,
-    /// Print environment, terminal, and bundled FFmpeg diagnostics.
+    /// Print environment, terminal, and configured FFmpeg diagnostics.
     Diagnostics,
     /// Benchmark ANSI frame generation and optionally write frames live.
     Benchmark {

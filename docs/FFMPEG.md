@@ -1,21 +1,36 @@
-# Pinned FFmpeg artifact
+# FFmpeg Setup and Licensing Boundary
 
-The POC does not link FFmpeg and does not require FFmpeg headers. Its runtime
-sidecars are fetched from one exact asset and kept out of Git.
+Terminal Video Player does not link statically or dynamically to FFmpeg
+libraries. It starts separate `ffprobe.exe` and `ffmpeg.exe` processes with
+individual arguments, reads JSON/raw RGB/raw PCM from pipes, and contains the
+decoder processes with a Windows Job Object.
 
-| Field | Value |
-| --- | --- |
-| Distributor | BtbN/FFmpeg-Builds |
-| Release | `autobuild-2026-06-30-13-34` |
-| Asset | `ffmpeg-n8.1.2-21-gce3c09c101-win64-lgpl-shared-8.1.zip` |
-| Size | `70,103,338` bytes |
-| SHA-256 | `27bcaf58b5140171dfe838a0b365d12c60607d71fc168424456410bad6a834da` |
-| Build recipe commit | `7a83528ea3431e9eca982a712bc3a7cd0789d5d0` |
-| FFmpeg commit | `ce3c09c101c83add623774d414a9f9498caf5c25` |
+This public repository contains source and setup instructions only. It does not
+contain or publish FFmpeg executables, DLLs, codecs, downloaded archives,
+installers, portable ZIPs, or binary release assets. The historical v0.1.0
+source-only prerelease has no attached assets and does not redistribute FFmpeg.
 
-The script fails closed on a hash mismatch. It also checks the binary's
-version token and `-buildconf` output against the same JSON manifest consumed by
-the Rust runtime. Expected flags are:
+## Supported local setup
+
+The runtime expects `ffmpeg.exe` and `ffprobe.exe` in one directory. Choose the
+directory with `--ffmpeg-dir` or `TERMINAL_VIDEO_PLAYER_FFMPEG_DIR`.
+
+For reproducible local development, the optional helper downloads the exact
+external artifact recorded in
+[`../third-party/ffmpeg-artifact.json`](../third-party/ffmpeg-artifact.json):
+
+```powershell
+.\scripts\Fetch-Ffmpeg.ps1
+$env:TERMINAL_VIDEO_PLAYER_FFMPEG_DIR = `
+  (Resolve-Path '.\tools\ffmpeg').Path
+```
+
+The helper verifies the pinned SHA-256 before extraction, validates the runtime
+version token and build flags, downloads the named license files, and writes
+only inside the checkout. Its default destination and cache paths are ignored
+by Git. Do not run the helper elevated.
+
+Runtime validation requires:
 
 ```text
 --enable-version3
@@ -30,21 +45,28 @@ and rejects:
 --enable-nonfree
 ```
 
-The GitHub release is not marked immutable. The URL and SHA-256 are therefore
-both required, and a disappearing asset must be replaced through an explicit
-manifest review rather than by selecting "latest."
+Playback also passes `-protocol_whitelist file,pipe` before each input. This
+enforces the documented local-only model and prevents a local playlist or
+manifest from resolving nested HTTP or other network protocols.
 
-Authoritative references:
+## Redistribution decision
 
-- FFmpeg download policy: <https://ffmpeg.org/download.html>
-- FFmpeg legal guidance: <https://ffmpeg.org/legal.html>
-- Build repository: <https://github.com/BtbN/FFmpeg-Builds>
-- FFmpeg source commit:
-  <https://github.com/FFmpeg/FFmpeg/commit/ce3c09c101c83add623774d414a9f9498caf5c25>
-- Build recipe commit:
-  <https://github.com/BtbN/FFmpeg-Builds/commit/7a83528ea3431e9eca982a712bc3a7cd0789d5d0>
+The selected artifact is an LGPL-oriented shared build, but its configuration
+enables numerous external libraries. Verifying only the archive hash, FFmpeg
+version, and absence of `--enable-gpl` or `--enable-nonfree` does not establish
+all notices, patent considerations, corresponding-source obligations, or
+redistribution requirements for every enabled component.
 
-The current artifact was selected for the architecture proof, not approved for
-a public/commercial release. Before redistribution, inspect every external
-library reported by `-buildconf`, preserve license/source materials, and obtain
-appropriate legal review.
+Therefore the supported public model is user-provided FFmpeg. Redistributing
+the selected FFmpeg archive, executables, DLLs, or a package that contains them
+is outside this project and outside this release. A future binary-distribution
+proposal must review the exact build configuration and every enabled component,
+preserve all required notices, establish corresponding-source compliance, and
+receive an appropriate legal review before publication.
+
+Authoritative upstream references:
+
+- [FFmpeg download policy](https://ffmpeg.org/download.html)
+- [FFmpeg legal guidance](https://ffmpeg.org/legal.html)
+- [FFmpeg source](https://github.com/FFmpeg/FFmpeg)
+- [BtbN FFmpeg Builds](https://github.com/BtbN/FFmpeg-Builds)

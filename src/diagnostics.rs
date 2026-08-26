@@ -53,7 +53,7 @@ pub fn print(ffmpeg: Option<&FfmpegPaths>) -> bool {
         }
         None => {
             println!(
-                "FFmpeg: not found beside the application; reinstall or pass --ffmpeg-dir <DIR>"
+                "FFmpeg: compatible external tools not found; install the supported build, pass --ffmpeg-dir <DIR>, or set TERMINAL_VIDEO_PLAYER_FFMPEG_DIR"
             );
             false
         }

@@ -5,7 +5,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum AppError {
     #[error(
-        "bundled FFmpeg tools were not found under {searched}. Reinstall the package or pass --ffmpeg-dir <DIR>"
+        "compatible FFmpeg tools were not found under {searched}. Install the supported build or pass --ffmpeg-dir <DIR>"
     )]
     FfmpegMissing { searched: PathBuf },
 

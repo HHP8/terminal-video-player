@@ -1,47 +1,70 @@
-# Third-party notices
+# Third-Party Notices
 
-The `terminal-video-player` Rust source is distributed under the MIT license.
-Its Rust dependency inventory is locked by `Cargo.lock`; each dependency remains
-under its own license.
+The first-party Terminal Video Player source is distributed under the MIT
+License. Third-party projects and dependencies retain their own copyrights and
+licenses.
 
-## FFmpeg
+## tplay
 
-POC packages use the exact BtbN Windows x64 LGPL shared FFmpeg artifact recorded
-in `third-party/ffmpeg-artifact.json`.
+- Project name: `tplay`
+- Repository: <https://github.com/maxcurzi/tplay>
+- Copyright: `Copyright (c) 2023 Max Curzi`
+- License: MIT
 
-- Upstream: <https://ffmpeg.org/>
-- Corresponding source commit:
-  `ce3c09c101c83add623774d414a9f9498caf5c25`
-- Build recipe commit:
-  `7a83528ea3431e9eca982a712bc3a7cd0789d5d0`
-- Expected posture: LGPLv3-or-later (`--enable-version3 --enable-shared
-  --disable-static`) with neither `--enable-gpl` nor `--enable-nonfree`
+Terminal Video Player is a separate, independently developed project inspired
+in part by tplay. It is not affiliated with or endorsed by tplay or its author.
+The Detailed ASCII character ramp in `src/render/glyph.rs` was adapted from
+tplay's `CHARS3` ramp. No exclusive ownership is claimed over that adapted
+material.
 
-The fetch process records the actual `ffmpeg -version` and `ffmpeg -buildconf`
-output. Packaging must stop if the denylisted flags are found. The executable,
-DLLs, build metadata, corresponding source location, and license material must
-travel together.
+The complete applicable tplay MIT license text follows:
 
-FFmpeg's license depends on its exact build configuration and enabled external
-libraries. The BtbN build scripts being MIT-licensed does not change the license
-of the produced FFmpeg binaries. Codec patent requirements can also vary by
-jurisdiction.
+```text
+MIT License
+
+Copyright (c) 2023 Max Curzi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ## Rust dependencies
 
-The exact direct dependency metadata and locked-graph counts are recorded in
-`docs/DEPENDENCIES.md`. This includes Apache-2.0-only CPAL and a transitive
-Unicode-3.0 license expression. The POC package does not yet contain all Rust
-dependency license texts.
+The exact locked dependency graph contains 174 third-party package/version
+pairs. Cargo metadata reported no missing license expression. The complete
+inventory is in [`third-party/rust-dependencies.csv`](third-party/rust-dependencies.csv),
+and the review method and license-choice notes are in
+[`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
 
-Before a public release, generate and review a machine-readable notice bundle
-with `cargo-about` or `cargo-deny`, publish an SBOM, and resolve every license
-choice. No such review is claimed complete by this POC.
+Each dependency remains subject to its own license. This notice does not claim
+ownership of dependency source, documentation, or trademarks.
 
-## Redistribution status
+## FFmpeg
 
-The generated POC ZIP is for local evaluation only. Public redistribution is
-blocked until the enabled FFmpeg external libraries and the Rust graph have a
-complete, reviewed license/source/notice bundle. A verified archive hash and the
-absence of `--enable-gpl`/`--enable-nonfree` do not by themselves complete that
-review.
+Terminal Video Player invokes separately installed `ffmpeg.exe` and
+`ffprobe.exe` processes. It does not link to FFmpeg libraries, and this
+repository does not distribute FFmpeg executables, DLLs, codecs, archives, or
+portable packages.
+
+The optional local setup helper downloads the exact external build described in
+[`third-party/ffmpeg-artifact.json`](third-party/ffmpeg-artifact.json). FFmpeg's
+license and redistribution obligations depend on the exact build configuration
+and enabled third-party libraries. The manifest's LGPL-oriented flags and hash
+checks are useful provenance controls, but they do not establish a sufficient
+basis for redistributing that binary build. See
+[`docs/FFMPEG.md`](docs/FFMPEG.md).

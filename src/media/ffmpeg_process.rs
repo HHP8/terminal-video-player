@@ -115,6 +115,8 @@ pub fn build_video_command(
         .arg("-nostdin")
         .arg("-ss")
         .arg(format_seconds(start))
+        .arg("-protocol_whitelist")
+        .arg("file,pipe")
         .arg("-i")
         .arg(media)
         .arg("-map")
@@ -153,6 +155,8 @@ pub fn build_audio_command(
         .arg("-nostdin")
         .arg("-ss")
         .arg(format_seconds(start))
+        .arg("-protocol_whitelist")
+        .arg("file,pipe")
         .arg("-i")
         .arg(media)
         .arg("-map")
@@ -503,5 +507,35 @@ mod tests {
         let command = build_video_command(&paths, media, Duration::ZERO, 30.0, 640, 360);
         let expected = OsString::from(media);
         assert!(command.get_args().any(|argument| argument == expected));
+    }
+
+    #[test]
+    fn decoder_commands_restrict_nested_input_protocols() {
+        let directory = Path::new("C:\\ffmpeg");
+        let paths = FfmpegPaths {
+            directory: directory.to_path_buf(),
+            ffmpeg: directory.join("ffmpeg.exe"),
+            ffprobe: directory.join("ffprobe.exe"),
+        };
+        let media = Path::new("movie.mp4");
+
+        for command in [
+            build_video_command(&paths, media, Duration::ZERO, 30.0, 640, 360),
+            build_audio_command(&paths, media, Duration::ZERO, 48_000, 2),
+        ] {
+            let arguments = command.get_args().map(OsString::from).collect::<Vec<_>>();
+            let expected = [
+                OsString::from("-protocol_whitelist"),
+                OsString::from("file,pipe"),
+                OsString::from("-i"),
+                OsString::from(media),
+            ];
+            assert!(
+                arguments
+                    .windows(expected.len())
+                    .any(|window| window == expected),
+                "decoder input is missing the local-only protocol policy: {arguments:?}"
+            );
+        }
     }
 }

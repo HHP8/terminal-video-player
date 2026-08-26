@@ -57,10 +57,9 @@ impl FfmpegPaths {
     }
 
     pub fn version(&self) -> Result<String> {
-        let output =
-            tool_output(&self.ffmpeg, "-version").context("running bundled ffmpeg -version")?;
+        let output = tool_output(&self.ffmpeg, "-version").context("running ffmpeg -version")?;
         if !output.status.success() {
-            anyhow::bail!("bundled ffmpeg -version exited with {}", output.status);
+            anyhow::bail!("ffmpeg -version exited with {}", output.status);
         }
         Ok(String::from_utf8_lossy(&output.stdout)
             .lines()
@@ -71,11 +70,11 @@ impl FfmpegPaths {
 
     pub fn validate_runtime(&self) -> Result<()> {
         let ffmpeg_version =
-            tool_output(&self.ffmpeg, "-version").context("validating bundled ffmpeg.exe")?;
+            tool_output(&self.ffmpeg, "-version").context("validating ffmpeg.exe")?;
         let ffprobe_version =
-            tool_output(&self.ffprobe, "-version").context("validating bundled ffprobe.exe")?;
+            tool_output(&self.ffprobe, "-version").context("validating ffprobe.exe")?;
         let build = tool_output(&self.ffmpeg, "-buildconf")
-            .context("reading bundled FFmpeg build configuration")?;
+            .context("reading FFmpeg build configuration")?;
         for (name, output) in [
             ("ffmpeg.exe", &ffmpeg_version),
             ("ffprobe.exe", &ffprobe_version),
@@ -96,7 +95,7 @@ impl FfmpegPaths {
             || !ffprobe_text.contains(&manifest.runtime_version_token)
         {
             anyhow::bail!(
-                "FFmpeg sidecar version mismatch; expected {}. Reinstall the package or pass the matching --ffmpeg-dir",
+                "FFmpeg version mismatch; expected {}. Install the supported build or pass the matching --ffmpeg-dir",
                 manifest.runtime_version_token
             );
         }
@@ -130,12 +129,12 @@ fn validate_build_configuration(
     let normalized = configuration.to_ascii_lowercase();
     for required in expected_flags {
         if !normalized.contains(required) {
-            anyhow::bail!("FFmpeg sidecar is missing required build flag {required}");
+            anyhow::bail!("FFmpeg is missing required build flag {required}");
         }
     }
     for rejected in rejected_flags {
         if normalized.contains(rejected) {
-            anyhow::bail!("FFmpeg sidecar contains rejected build flag {rejected}");
+            anyhow::bail!("FFmpeg contains rejected build flag {rejected}");
         }
     }
     Ok(())
@@ -177,24 +176,10 @@ struct RawFormat {
 }
 
 pub fn probe(paths: &FfmpegPaths, path: &Path) -> Result<ProbeInfo> {
-    let mut command = Command::new(&paths.ffprobe);
-    command
-        .arg("-v")
-        .arg("error")
-        .arg("-show_entries")
-        .arg("stream=index,codec_name,codec_type,width,height,avg_frame_rate,r_frame_rate,start_time,duration:format=duration,start_time")
-        .arg("-of")
-        .arg("json")
-        .arg(path)
-        .stdin(Stdio::null())
-        .stderr(Stdio::piped())
-        .stdout(Stdio::piped());
-    #[cfg(windows)]
-    configure_hidden(&mut command);
-
+    let mut command = build_probe_command(paths, path);
     let output = command.output().with_context(|| {
         format!(
-            "starting bundled ffprobe for {}. Reinstall the package or verify --ffmpeg-dir",
+            "starting ffprobe for {}. Install the supported FFmpeg build or verify --ffmpeg-dir",
             path.display()
         )
     })?;
@@ -207,6 +192,27 @@ pub fn probe(paths: &FfmpegPaths, path: &Path) -> Result<ProbeInfo> {
     }
 
     parse_probe_json(&output.stdout, path)
+}
+
+fn build_probe_command(paths: &FfmpegPaths, path: &Path) -> Command {
+    let mut command = Command::new(&paths.ffprobe);
+    command
+        .arg("-v")
+        .arg("error")
+        .arg("-show_entries")
+        .arg("stream=index,codec_name,codec_type,width,height,avg_frame_rate,r_frame_rate,start_time,duration:format=duration,start_time")
+        .arg("-of")
+        .arg("json")
+        .arg("-protocol_whitelist")
+        .arg("file,pipe")
+        .arg("-i")
+        .arg(path)
+        .stdin(Stdio::null())
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped());
+    #[cfg(windows)]
+    configure_hidden(&mut command);
+    command
 }
 
 fn parse_probe_json(json: &[u8], path: &Path) -> Result<ProbeInfo> {
@@ -279,6 +285,8 @@ pub fn bounded_dimensions(width: u32, height: u32, max_width: u32, max_height: u
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsString;
+
     use super::*;
 
     #[test]
@@ -338,6 +346,31 @@ mod tests {
                 &manifest.rejected_flags,
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn probe_command_restricts_nested_input_protocols_and_binds_the_input() {
+        let directory = Path::new("C:\\ffmpeg");
+        let paths = FfmpegPaths {
+            directory: directory.to_path_buf(),
+            ffmpeg: directory.join("ffmpeg.exe"),
+            ffprobe: directory.join("ffprobe.exe"),
+        };
+        let path = Path::new("-playlist.m3u8");
+        let command = build_probe_command(&paths, path);
+        let arguments = command.get_args().map(OsString::from).collect::<Vec<_>>();
+        let expected = [
+            OsString::from("-protocol_whitelist"),
+            OsString::from("file,pipe"),
+            OsString::from("-i"),
+            OsString::from(path),
+        ];
+        assert!(
+            arguments
+                .windows(expected.len())
+                .any(|window| window == expected),
+            "probe input is missing the local-only policy or explicit binding: {arguments:?}"
         );
     }
 }

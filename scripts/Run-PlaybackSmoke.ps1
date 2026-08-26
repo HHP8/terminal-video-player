@@ -55,7 +55,7 @@ $started.Stop()
 $result = @(
     "exit_code=$exitCode"
     "elapsed_ms=$([math]::Round($started.Elapsed.TotalMilliseconds, 1))"
-    "media=$Media"
+    "media_name=$([IO.Path]::GetFileName($Media))"
     "no_audio=$($NoAudio.IsPresent)"
     "display_mode=$DisplayMode"
 )

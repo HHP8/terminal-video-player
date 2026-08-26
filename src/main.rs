@@ -34,7 +34,7 @@ fn run() -> Result<()> {
         Some(Command::Diagnostics) => {
             let ffmpeg = FfmpegPaths::resolve(cli.ffmpeg_dir.as_deref()).ok();
             if !diagnostics::print(ffmpeg.as_ref()) {
-                anyhow::bail!("the bundled FFmpeg runtime is missing or incompatible");
+                anyhow::bail!("the configured FFmpeg runtime is missing or incompatible");
             }
             return Ok(());
         }

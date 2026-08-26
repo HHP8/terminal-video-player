@@ -8,6 +8,7 @@ LICENSE text eol=lf
 *.rs text eol=lf
 *.toml text eol=lf
 *.json text eol=lf
+*.csv text eol=lf
 *.md text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
@@ -15,12 +16,24 @@ LICENSE text eol=lf
 
 *.dll binary
 *.exe binary
+*.msi binary
+*.7z binary
+*.gz binary
+*.rar binary
+*.tar binary
+*.tgz binary
+*.xz binary
 *.gif binary
 *.ico binary
 *.jpeg binary
 *.jpg binary
 *.mp3 binary
 *.mp4 binary
+*.mpeg binary
+*.mpg binary
+*.mov binary
+*.mkv binary
+*.webm binary
 *.png binary
 *.wav binary
 *.zip binary

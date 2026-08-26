@@ -1,38 +1,42 @@
-# Locked dependency inventory
+# Rust Dependency License Inventory
 
-`Cargo.lock` is committed and direct requirements are exact-pinned. The Windows
-x64 normal/build graph currently resolves to 73 unique package/version pairs.
-The broader Windows graph including development and benchmark dependencies
-resolves to 103. Cargo metadata reports a non-empty SPDX-style license
-expression for every package in those graphs.
+The application keeps `Cargo.lock` in source control. On 2026-08-26, the full
+locked graph was read with:
 
-## Direct runtime dependencies
+```powershell
+cargo metadata --format-version 1 --locked --offline
+```
 
-| Package | Version | Declared license |
-| --- | ---: | --- |
-| `anyhow` | 1.0.104 | MIT OR Apache-2.0 |
-| `clap` | 4.6.4 | MIT OR Apache-2.0 |
-| `crossbeam-channel` | 0.5.16 | MIT OR Apache-2.0 |
-| `crossterm` | 0.29.0 | MIT |
-| `ctrlc` | 3.5.2 | MIT/Apache-2.0 |
-| `image` | 0.25.10 | MIT OR Apache-2.0 |
-| `serde` | 1.0.229 | MIT OR Apache-2.0 |
-| `serde_json` | 1.0.151 | MIT OR Apache-2.0 |
-| `thiserror` | 2.0.19 | MIT OR Apache-2.0 |
-| `unicode-width` | 0.2.2 | MIT OR Apache-2.0 |
-| `cpal` | 0.18.1 | Apache-2.0 |
-| `windows` | 0.62.2 | MIT OR Apache-2.0 |
+The resulting conservative inventory contains 174 third-party package/version
+pairs across normal, development, build, target-specific, and transitive
+dependencies. It is stored in
+[`../third-party/rust-dependencies.csv`](../third-party/rust-dependencies.csv).
 
-## Direct development dependencies
+## Review result
 
-| Package | Version | Declared license |
-| --- | ---: | --- |
-| `criterion` | 0.8.2 | Apache-2.0 OR MIT |
-| `tempfile` | 3.27.0 | MIT OR Apache-2.0 |
+- Missing or unknown Cargo license expressions: **0**
+- Non-commercial or source-available-only expressions: **0**
+- Expressions without a compatible permissive choice: **0**
+- Review blocker: **none identified**
 
-This metadata check is not a complete legal review and does not produce the
-license texts required for public redistribution. In particular, the
-transitive graph includes Unicode-3.0 and several BSD/Zlib/Unlicense choices.
-Before a public release, generate a reviewed notice bundle and SBOM with
-`cargo-about` or `cargo-deny`; do not infer approval from the absence of missing
-Cargo license fields.
+The detected expressions use MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, Zlib,
+0BSD, Unlicense, Unicode-3.0, and the LLVM exception. Expressions containing
+`LGPL-2.1-or-later` provide an explicit `MIT OR Apache-2.0` alternative in the
+locked metadata; this project relies on a permissive alternative rather than
+selecting LGPL for that dependency. `unicode-ident` combines a permissive
+MIT/Apache choice with Unicode-3.0, whose notice must also be respected.
+
+This inventory records Cargo's declared metadata, not a legal opinion and not a
+substitute for preserving notices required by a dependency when distributing a
+binary. This repository publishes source only and does not vendor dependency
+source. Any future binary distribution should regenerate the inventory, include
+required dependency notices, and repeat the review against the exact release
+graph.
+
+## Direct dependencies
+
+Direct runtime dependencies are `anyhow`, `clap`, `crossbeam-channel`,
+`crossterm`, `ctrlc`, `image`, `serde`, `serde_json`, `thiserror`, and
+`unicode-width`, plus Windows-only `cpal` and `windows`. Development dependencies
+are `criterion` and `tempfile`. Exact versions and the full transitive graph are
+authoritative in `Cargo.lock` and the CSV inventory.

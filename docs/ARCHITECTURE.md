@@ -4,7 +4,7 @@
 flowchart LR
     Path["Local PathBuf input"] --> Router["Source router"]
     Router --> Image["Pure-Rust image/GIF decoder"]
-    Router --> Probe["Pinned ffprobe JSON"]
+    Router --> Probe["Configured ffprobe JSON"]
     Probe --> Video["FFmpeg RGB24 process"]
     Probe --> Audio["FFmpeg 48 kHz PCM process"]
     Video --> VideoQ["Bounded frame queue"]
@@ -28,7 +28,8 @@ flowchart LR
 ## Boundaries
 
 - `media` owns probing, process argument construction, raw-pipe readers, and
-  bounded decoder queues. It does not know about terminal rendering.
+  bounded decoder queues. FFmpeg and ffprobe inputs use a local-only protocol
+  whitelist. The module does not know about terminal rendering.
 - `audio` owns device negotiation, the real-time callback, mute/pause state, and
   the audio clock. The callback never blocks, logs, or invokes FFmpeg.
 - `playback` owns decoder generations, pause/seek/restart, frame deadlines, and
@@ -82,6 +83,18 @@ before raw mode or the alternate screen is entered. Decoder processes are
 started afterward in a kill-on-close Job Object. This keeps synchronous,
 potentially slow input validation out of altered terminal state.
 
+GIF decoding applies strict 4096x4096 dimension limits and a 256 MiB decoder
+allocation budget. Frames are decoded incrementally and rejected before
+retention when the animation would exceed 10,000 frames or 256 MiB of decoded
+RGB data. The resulting bounded frame vector remains in memory to support
+looping without reopening the source.
+
+Every ffprobe, video-decoder, and audio-decoder input is preceded by
+`-protocol_whitelist file,pipe`. The top-level media path is local, and nested
+playlist or manifest resolution cannot opt into HTTP or other network
+protocols. Paths remain separate operating-system arguments; no shell string is
+constructed.
+
 For an interactive video launch without `--display-mode`, the application enters
 one guarded terminal session after probing and shows the five-mode selector.
 Number keys select immediately, Enter selects Default, and cancellation drops
@@ -127,7 +140,7 @@ the restored PowerShell prompt.
   does not create the child suspended.
 - CPAL timestamp-based scheduling still needs external flash/click capture to
   prove end-to-end A/V skew.
-- Animated GIFs are decoded into memory.
+- Animated GIFs are preloaded into memory within the documented safety limits.
 - A hard process kill cannot execute RAII or panic cleanup.
 - Windows Terminal pixel cell dimensions are not assumed; the default cell
   aspect is configurable.

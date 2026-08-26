@@ -2,6 +2,7 @@ use crate::cli::DisplayModeChoice;
 
 pub const DEFAULT_RAMP: &str = " .:-=+*#%@";
 pub const CLASSIC_ASCII_RAMP: &str = " .:-=+*#%@";
+// Adapted from tplay's CHARS3 ramp under the MIT License. See THIRD-PARTY-NOTICES.md.
 pub const DETAILED_ASCII_RAMP: &str =
     " .-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
 pub const GRADIENT_RAMP: &str = " ░▒▓█";
