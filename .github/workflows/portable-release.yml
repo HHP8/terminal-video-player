@@ -204,7 +204,7 @@ jobs:
       matrix:
         replica: [a, b]
     env:
-      RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=. -C link-arg=/Brepro
+      RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=. -C link-arg=/Brepro -C target-feature=+crt-static
       SOURCE_DATE_EPOCH: ${{ needs.metadata.outputs.epoch }}
     steps:
       - name: Check out the exact workflow commit

@@ -85,5 +85,13 @@ foreach ($RuntimeContract in @(
 if ($Workflow -match '(?s)Run packaged FFmpeg integration tests.*cargo test') {
     throw 'Runtime validation must exercise the extracted packaged player rather than a checkout-built test binary.'
 }
+if (-not $Workflow.Contains('target-feature=+crt-static', [StringComparison]::Ordinal)) {
+    throw 'Portable player builds must statically link the MSVC runtime.'
+}
+
+$Components = Get-Content -LiteralPath (Join-Path $RepoRoot 'third-party\ffmpeg-components.json') -Raw | ConvertFrom-Json
+if (@($Components.allowed_player_pe_imports | Where-Object { $_ -match '(?i)^VCRUNTIME.*\.dll$' }).Count -ne 0) {
+    throw 'Portable player import policy must not allow a redistributable VC runtime DLL.'
+}
 
 Write-Host 'Portable workflow policy validation passed.'

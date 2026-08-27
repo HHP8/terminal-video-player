@@ -30,8 +30,12 @@
   ],
   "allowed_player_pe_imports": [
     "ADVAPI32.dll",
+    "api-ms-win-core-synch-l1-2-0.dll",
+    "api-ms-win-core-winrt-error-l1-1-0.dll",
     "bcrypt.dll",
+    "combase.dll",
     "KERNEL32.dll",
+    "mmdevapi.dll",
     "ntdll.dll",
     "ole32.dll",
     "OLEAUT32.dll",
