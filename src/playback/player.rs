@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crossbeam_channel::{Receiver, TryRecvError};
 
 use super::clock::WallClock;
@@ -70,6 +70,103 @@ pub fn prepare(input: &Path, cli: &Cli) -> Result<PreparedMedia> {
         paths,
         info,
     })
+}
+
+/// Exercise the real decoding and ANSI rendering paths without requiring an interactive terminal.
+/// This is used by the release pipeline against the executable extracted from the portable ZIP.
+pub fn validate_media(input: &Path, cli: &Cli, display_mode: DisplayMode) -> Result<()> {
+    let media = prepare(input, cli)?;
+    let frame = match media {
+        PreparedMedia::Image(ImageSource::Still(frame)) => frame,
+        PreparedMedia::Image(ImageSource::Gif(frames)) => frames
+            .into_iter()
+            .next()
+            .context("GIF contains no decoded frames")?
+            .frame,
+        PreparedMedia::Video { input, paths, info } => {
+            validate_video_decode(&input, &paths, &info, cli)?
+        }
+    };
+    validate_frame_render(&frame, cli, display_mode)
+}
+
+fn validate_video_decode(
+    input: &Path,
+    paths: &FfmpegPaths,
+    info: &ProbeInfo,
+    cli: &Cli,
+) -> Result<RgbFrame> {
+    let fps = cli
+        .fps
+        .map(f64::from)
+        .unwrap_or(info.frame_rate.clamp(1.0, 30.0));
+    let (width, height) = bounded_dimensions(info.width, info.height, 160, 90);
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let mut job = Job::new()?;
+    let mut video_worker = None;
+    let mut audio_worker = None;
+    let validation = (|| -> Result<RgbFrame> {
+        let (video, worker) = spawn_video(
+            paths,
+            input,
+            Duration::ZERO,
+            fps,
+            width,
+            height,
+            0,
+            &job,
+            Arc::clone(&cancelled),
+        )?;
+        video_worker = Some(worker);
+        let frame = match video.events.recv_timeout(Duration::from_secs(10)) {
+            Ok(VideoEvent::Frame(frame)) => frame,
+            Ok(VideoEvent::End) => anyhow::bail!("video ended before producing a validation frame"),
+            Ok(VideoEvent::Error(error)) => anyhow::bail!("video decoder failed: {error}"),
+            Err(error) => anyhow::bail!("timed out waiting for a validation frame: {error}"),
+        };
+        if info.has_audio {
+            let (audio, worker) = spawn_audio(
+                paths,
+                input,
+                Duration::ZERO,
+                AUDIO_SAMPLE_RATE,
+                AUDIO_CHANNELS,
+                &job,
+                Arc::clone(&cancelled),
+            )?;
+            audio_worker = Some(worker);
+            let samples = audio
+                .samples
+                .recv_timeout(Duration::from_secs(10))
+                .context("waiting for a validation audio chunk")?;
+            if samples.is_empty() || samples.len() % usize::from(AUDIO_CHANNELS) != 0 {
+                anyhow::bail!("audio decoder produced an invalid validation chunk");
+            }
+        }
+        Ok(frame)
+    })();
+    cancelled.store(true, Ordering::Release);
+    job.terminate();
+    if let Some(mut worker) = video_worker {
+        worker.join();
+    }
+    if let Some(mut worker) = audio_worker {
+        worker.join();
+    }
+    validation
+}
+
+fn validate_frame_render(frame: &RgbFrame, cli: &Cli, display_mode: DisplayMode) -> Result<()> {
+    if !frame.validate() {
+        anyhow::bail!("decoded validation frame is malformed");
+    }
+    let grid = sample_cells_with_mode(frame, 40, 20, cli.cell_aspect, display_mode);
+    let mut renderer = AnsiRenderer::new(cli.renderer.into(), ColorCapability::Truecolor);
+    let encoded = renderer.encode(&grid);
+    if encoded.is_empty() {
+        anyhow::bail!("ANSI renderer produced an empty validation frame");
+    }
+    Ok(())
 }
 
 pub fn play(
@@ -673,6 +770,7 @@ fn format_duration(duration: Duration) -> String {
 
 #[cfg(test)]
 mod tests {
+    use clap::Parser;
     use crossbeam_channel::unbounded;
 
     use super::*;
@@ -720,5 +818,28 @@ mod tests {
         assert_eq!(receiver.len(), 10 - LOCAL_VIDEO_FRAMES);
         assert!(!ended);
         assert!(error.is_none());
+    }
+
+    #[test]
+    fn noninteractive_validation_renders_every_display_mode() {
+        let cli = Cli::try_parse_from(["terminal-video-player", "fixture.png"])
+            .expect("validation CLI");
+        let frame = RgbFrame {
+            generation: 0,
+            index: 0,
+            pts: Duration::ZERO,
+            width: 2,
+            height: 2,
+            rgb: vec![255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255].into_boxed_slice(),
+        };
+        for mode in [
+            DisplayMode::Default,
+            DisplayMode::ClassicAscii,
+            DisplayMode::DetailedAscii,
+            DisplayMode::Gradient,
+            DisplayMode::HalfBlock,
+        ] {
+            validate_frame_render(&frame, &cli, mode).expect("render validation frame");
+        }
     }
 }

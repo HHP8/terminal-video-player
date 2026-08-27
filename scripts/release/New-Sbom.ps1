@@ -5,6 +5,8 @@ param(
     [Parameter(Mandatory)] [ValidatePattern('^[0-9a-f]{40}$')] [string]$Commit,
     [Parameter(Mandatory)] [long]$SourceDateEpoch,
     [Parameter(Mandatory)] [string]$PackageManifestPath,
+    [Parameter(Mandatory)] [string]$RustDependencyInventoryPath,
+    [string]$ReviewedLicenseInventoryPath,
     [Parameter(Mandatory)] [string]$ToolchainLicenseDirectory,
     [Parameter(Mandatory)] [string]$OutputPath
 )
@@ -12,7 +14,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $RepositoryRoot = [IO.Path]::GetFullPath($RepositoryRoot)
 $Metadata = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'third-party\ffmpeg-artifact.json') -Raw | ConvertFrom-Json
-$InventoryRows = @(Import-Csv -LiteralPath (Join-Path $RepositoryRoot 'third-party\rust-dependencies.csv'))
+if ([string]::IsNullOrWhiteSpace($ReviewedLicenseInventoryPath)) {
+    $ReviewedLicenseInventoryPath = Join-Path $RepositoryRoot 'third-party\rust-dependencies.csv'
+}
+$InventoryRows = @(Import-Csv -LiteralPath $ReviewedLicenseInventoryPath)
 $Inventory = @{}
 foreach ($Row in $InventoryRows) {
     $Key = "$($Row.name)`0$($Row.version)"
@@ -23,8 +28,11 @@ foreach ($Row in $InventoryRows) {
     $Inventory[$Key] = $Row
 }
 
-$LockText = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'Cargo.lock') -Raw
-$Blocks = [regex]::Matches($LockText, '(?ms)^\[\[package\]\]\s*(?<body>.*?)(?=^\[\[package\]\]|\z)')
+$ReleaseInventory = Get-Content -LiteralPath $RustDependencyInventoryPath -Raw | ConvertFrom-Json
+if ($ReleaseInventory.target -cne 'x86_64-pc-windows-msvc' -or
+    (@($ReleaseInventory.dependencyEdges) -join ',') -cne 'normal,build') {
+    throw 'Rust dependency inventory is not the reviewed Windows normal/build release graph.'
+}
 $Packages = [Collections.Generic.List[object]]::new()
 $Relationships = [Collections.Generic.List[object]]::new()
 $ExtractedLicenses = [Collections.Generic.List[object]]::new()
@@ -45,16 +53,9 @@ $Relationships.Add([ordered]@{
     relatedSpdxElement = $AppId
 })
 
-foreach ($Match in $Blocks) {
-    $Body = $Match.Groups['body'].Value
-    $NameMatch = [regex]::Match($Body, '(?m)^name = "(?<value>[^"]+)"$')
-    $VersionMatch = [regex]::Match($Body, '(?m)^version = "(?<value>[^"]+)"$')
-    $SourceMatch = [regex]::Match($Body, '(?m)^source = "(?<value>[^"]+)"$')
-    $ChecksumMatch = [regex]::Match($Body, '(?m)^checksum = "(?<value>[0-9a-f]{64})"$')
-    if (-not $NameMatch.Success -or -not $VersionMatch.Success) { throw 'Cargo.lock contains an incomplete package block.' }
-    $Name = $NameMatch.Groups['value'].Value
-    $PackageVersion = $VersionMatch.Groups['value'].Value
-    if ($Name -eq 'terminal-video-player') { continue }
+foreach ($ReleasePackage in @($ReleaseInventory.packages)) {
+    $Name = [string]$ReleasePackage.name
+    $PackageVersion = [string]$ReleasePackage.version
     $Key = "$Name`0$PackageVersion"
     if (-not $Inventory.ContainsKey($Key)) { throw "Rust dependency license inventory is missing $Name $PackageVersion." }
     $License = ([string]$Inventory[$Key].detected_license).Replace('/', ' OR ')
@@ -63,7 +64,7 @@ foreach ($Match in $Blocks) {
         name = $Name
         SPDXID = $SpdxId
         versionInfo = $PackageVersion
-        downloadLocation = if ($SourceMatch.Success) { $SourceMatch.Groups['value'].Value } else { 'NOASSERTION' }
+        downloadLocation = [string]$ReleasePackage.source
         filesAnalyzed = $false
         licenseConcluded = $License
         licenseDeclared = $License
@@ -73,9 +74,6 @@ foreach ($Match in $Blocks) {
             referenceType = 'purl'
             referenceLocator = "pkg:cargo/$Name@$PackageVersion"
         })
-    }
-    if ($ChecksumMatch.Success) {
-        $Package.checksums = @([ordered]@{ algorithm = 'SHA256'; checksumValue = $ChecksumMatch.Groups['value'].Value })
     }
     $Packages.Add($Package)
     $Relationships.Add([ordered]@{

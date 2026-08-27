@@ -111,6 +111,7 @@
       "licenses/Toolchain/MINGW-W64-RUNTIME.txt",
       "manifest/PACKAGE-MANIFEST.json",
       "manifest/SHA256SUMS",
+      "provenance/BINARY-STRINGS-SCAN.txt",
       "provenance/CONFIGURE-COMMAND.txt",
       "provenance/FFMPEG-BUILDCONF.txt",
       "provenance/FFMPEG-COMPONENTS.json",
@@ -124,14 +125,21 @@
       "provenance/FFMPEG-PROTOCOLS.txt",
       "provenance/FFMPEG-VERSION.txt",
       "provenance/FFPROBE-VERSION.txt",
+      "provenance/PLAYER-BINARY-STRINGS-SCAN.txt",
+      "provenance/PLAYER-PE-IMPORTS.json",
       "provenance/PROVENANCE.json",
       "provenance/RUNNER.json",
+      "provenance/RUST-TOOLCHAIN.txt",
       "provenance/TOOLCHAIN.txt",
+      "provenance/WINDOWS-RUNNER.json",
       "README-PORTABLE.md",
       "terminal-video-player.exe",
       "THIRD-PARTY-NOTICES.md",
       "tools/ffmpeg/ffmpeg.exe",
       "tools/ffmpeg/ffprobe.exe"
+    ],
+    "runtime_prefixes": [
+      "licenses/Rust/"
     ],
     "published_asset_suffixes": [
       "-ffmpeg-corresponding-source.zip",

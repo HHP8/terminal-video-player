@@ -26,12 +26,15 @@ locked metadata; this project relies on a permissive alternative rather than
 selecting LGPL for that dependency. `unicode-ident` combines a permissive
 MIT/Apache choice with Unicode-3.0, whose notice must also be respected.
 
-This inventory records Cargo's declared metadata, not a legal opinion and not a
-substitute for preserving notices required by a dependency when distributing a
-binary. This repository publishes source only and does not vendor dependency
-source. Any future binary distribution should regenerate the inventory, include
-required dependency notices, and repeat the review against the exact release
-graph.
+This inventory records Cargo's declared metadata, not a legal opinion. The
+portable workflow derives the exact Windows release package set with
+`cargo tree --locked --target x86_64-pc-windows-msvc --edges normal,build`,
+matches that set against target-filtered Cargo metadata and the reviewed CSV,
+and excludes development-only and irrelevant target packages from the portable
+license bundle and SBOM. It fails if a selected dependency has no discoverable
+license or notice file, then bundles the detected files plus a hashed
+dependency-license inventory under `licenses/Rust`. Dependency source is not
+vendored into this repository.
 
 ## Direct dependencies
 

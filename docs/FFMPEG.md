@@ -1,72 +1,83 @@
-# FFmpeg Setup and Licensing Boundary
+# FFmpeg Setup, Build, and Licensing Boundary
 
 Terminal Video Player does not link statically or dynamically to FFmpeg
 libraries. It starts separate `ffprobe.exe` and `ffmpeg.exe` processes with
-individual arguments, reads JSON/raw RGB/raw PCM from pipes, and contains the
-decoder processes with a Windows Job Object.
+individual arguments, reads JSON, RGB, and PCM data through pipes, and contains
+the processes with a Windows Job Object.
 
-This public repository contains source and setup instructions only. It does not
-contain or publish FFmpeg executables, DLLs, codecs, downloaded archives,
-installers, portable ZIPs, or binary release assets. The historical v0.1.0
-source-only prerelease has no attached assets and does not redistribute FFmpeg.
+The historical `v0.1.0` source-only prerelease has no binary assets and remains
+unchanged. The portable pipeline introduced for `v0.1.1` does not use BtbN,
+Gyan, or any other prebuilt FFmpeg binary.
 
-## Supported local setup
+## Reviewed portable build
 
-The runtime expects `ffmpeg.exe` and `ffprobe.exe` in one directory. Choose the
-directory with `--ffmpeg-dir` or `TERMINAL_VIDEO_PLAYER_FFMPEG_DIR`.
+The workflow builds FFmpeg 9.0.1 from the official `ffmpeg.org` release archive
+for upstream tag `n9.0.1`, commit
+`bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa`. It verifies the archive byte size
+and SHA-256, detached signature, vendored signing-key SHA-256, and signing-key
+fingerprint before extraction or execution.
 
-For reproducible local development, the optional helper downloads the exact
-external artifact recorded in
-[`../third-party/ffmpeg-artifact.json`](../third-party/ffmpeg-artifact.json):
+The cross-toolchain is the version-specific llvm-mingw 20260616 UCRT artifact
+with LLVM 22.1.8. Its archive identity, source recipe commit, incorporated
+component source revisions, licenses, and SHA-256 are recorded in
+[`../third-party/ffmpeg-artifact.json`](../third-party/ffmpeg-artifact.json).
 
-```powershell
-.\scripts\Fetch-Ffmpeg.ps1
-$env:TERMINAL_VIDEO_PLAYER_FFMPEG_DIR = `
-  (Resolve-Path '.\tools\ffmpeg').Path
-```
+Configuration starts with `--disable-everything`. It disables autodetection,
+network access, shared libraries, documentation, debug information, and x86
+assembly, then enables only `ffmpeg`, `ffprobe`, static linking, the reviewed
+built-in libraries, and the exact component allowlist in
+[`../third-party/ffmpeg-components.json`](../third-party/ffmpeg-components.json).
+It rejects `--enable-gpl`, `--enable-nonfree`, `--enable-version3`, all external
+`--enable-lib*` options, TLS, hardware acceleration, and other prohibited
+configuration terms.
 
-The helper verifies the pinned SHA-256 before extraction, validates the runtime
-version token and build flags, downloads the named license files, and writes
-only inside the checkout. Its default destination and cache paths are ignored
-by Git. Do not run the helper elevated.
+The minimal build accepts only local file and pipe protocols. Its supported
+demuxers are AVI, FLAC, Matroska/WebM, MOV/MP4, MP3, MPEG-TS, Ogg, and WAV. Its
+allowlisted decoders are AAC, AV1, FLAC, H.264, HEVC, MP3, MPEG-4 Part 2, Opus,
+PCM S16LE, Vorbis, VP8, and VP9. The native MPEG-4 and AAC encoders, MOV muxer,
+and required lavfi sources and filters exist only to generate test media.
 
-Runtime validation requires:
+Playback still passes `-protocol_whitelist file,pipe` before every FFmpeg input,
+so local playlists and manifests cannot resolve nested HTTP or other network
+resources.
 
-```text
---enable-version3
---enable-shared
---disable-static
-```
+## License determination and compliance bundle
 
-and rejects:
+The reviewed configuration uses FFmpeg built-in LGPL-compatible functionality
+only and does not enable GPL, nonfree, version3, or external codec libraries.
+The expected FFmpeg license is `LGPL-2.1-or-later`. The audit executes
+`ffmpeg -L` and `ffmpeg -buildconf`, compares generated component macros with
+the exact allowlist, rejects unexpected PE imports, and fails closed on any
+configuration or license mismatch.
 
-```text
---enable-gpl
---enable-nonfree
-```
+Each portable package carries FFmpeg's `LICENSE.md`, the complete LGPL 2.1
+text, runtime build configuration, component inventory, binary hashes, PE
+imports, and toolchain notices. The same GitHub prerelease separately publishes
+the exact verified upstream source archive and signature, vendored verification
+key, all local patches (currently none), complete build scripts, configuration,
+audit evidence, rebuild instructions, source manifest, and hashes. This
+accompanying corresponding-source bundle is the project's conservative method
+for satisfying source-access obligations for the exact binaries.
 
-Playback also passes `-protocol_whitelist file,pipe` before each input. This
-enforces the documented local-only model and prevents a local playlist or
-manifest from resolving nested HTTP or other network protocols.
+FFmpeg is an independent third-party program. This project does not claim to
+author, own, endorse, or represent FFmpeg upstream.
 
-## Redistribution decision
+## Source-checkout setup
 
-The selected artifact is an LGPL-oriented shared build, but its configuration
-enables numerous external libraries. Verifying only the archive hash, FFmpeg
-version, and absence of `--enable-gpl` or `--enable-nonfree` does not establish
-all notices, patent considerations, corresponding-source obligations, or
-redistribution requirements for every enabled component.
+Outside the portable prerelease, put compatible `ffmpeg.exe` and `ffprobe.exe`
+in one directory and select it with `--ffmpeg-dir` or
+`TERMINAL_VIDEO_PLAYER_FFMPEG_DIR`. The runtime verifies its configured version
+and prohibited flags. A source checkout does not automatically download an
+unreviewed prebuilt binary.
 
-Therefore the supported public model is user-provided FFmpeg. Redistributing
-the selected FFmpeg archive, executables, DLLs, or a package that contains them
-is outside this project and outside this release. A future binary-distribution
-proposal must review the exact build configuration and every enabled component,
-preserve all required notices, establish corresponding-source compliance, and
-receive an appropriate legal review before publication.
+The reviewed minimal build can be reconstructed with the documented Ubuntu
+environment and [`../scripts/release/build-ffmpeg.sh`](../scripts/release/build-ffmpeg.sh).
+See [`RELEASING.md`](RELEASING.md) and the rebuilding instructions included in
+the corresponding-source bundle.
 
 Authoritative upstream references:
 
-- [FFmpeg download policy](https://ffmpeg.org/download.html)
+- [FFmpeg download and source releases](https://ffmpeg.org/download.html)
 - [FFmpeg legal guidance](https://ffmpeg.org/legal.html)
-- [FFmpeg source](https://github.com/FFmpeg/FFmpeg)
-- [BtbN FFmpeg Builds](https://github.com/BtbN/FFmpeg-Builds)
+- [FFmpeg license documentation](https://ffmpeg.org/doxygen/trunk/md_LICENSE.html)
+- [FFmpeg source repository](https://github.com/FFmpeg/FFmpeg)

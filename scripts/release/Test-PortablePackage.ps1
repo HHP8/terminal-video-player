@@ -16,14 +16,22 @@ $ExtractionDirectory = [IO.Path]::GetFullPath($ExtractionDirectory)
 
 $ActualPaths = @((Get-TreeManifest -Root $ExtractionDirectory).path | Sort-Object -CaseSensitive)
 $ExpectedPaths = @($Metadata.package.runtime_files | ForEach-Object { [string]$_ } | Sort-Object -CaseSensitive)
-if (($ActualPaths -join "`n") -cne ($ExpectedPaths -join "`n")) {
+$ExpectedPrefixes = @($Metadata.package.runtime_prefixes | ForEach-Object { [string]$_ })
+$Missing = @($ExpectedPaths | Where-Object { $_ -notin $ActualPaths })
+$Unexpected = @($ActualPaths | Where-Object {
+    $Path = $_
+    $Path -notin $ExpectedPaths -and @($ExpectedPrefixes | Where-Object {
+        $Path.StartsWith($_, [StringComparison]::Ordinal)
+    }).Count -eq 0
+})
+if ($Missing.Count -ne 0 -or $Unexpected.Count -ne 0) {
     throw 'Extracted portable inventory differs from the reviewed allowlist.'
 }
 
 $ManifestPath = Join-Path $ExtractionDirectory 'manifest\PACKAGE-MANIFEST.json'
 $Manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
 $ManifestPaths = @($Manifest.files.path | Sort-Object -CaseSensitive)
-$ExpectedManifestPaths = @($ExpectedPaths | Where-Object { $_ -notin @('manifest/PACKAGE-MANIFEST.json', 'manifest/SHA256SUMS') })
+$ExpectedManifestPaths = @($ActualPaths | Where-Object { $_ -notin @('manifest/PACKAGE-MANIFEST.json', 'manifest/SHA256SUMS') })
 if (($ManifestPaths -join "`n") -cne ($ExpectedManifestPaths -join "`n")) {
     throw 'Internal package manifest does not cover every payload file.'
 }
@@ -89,11 +97,28 @@ if (-not $SkipRuntime) {
     }
 
     $FixtureDirectory = Join-Path (Split-Path -Parent $ExtractionDirectory) 'runtime validation 漢字'
+    New-Item -ItemType Directory -Path $FixtureDirectory -Force | Out-Null
+    $Still = Join-Path $FixtureDirectory 'validation-still.png'
+    $Gif = Join-Path $FixtureDirectory 'validation-animation.gif'
+    [IO.File]::WriteAllBytes($Still, [Convert]::FromBase64String(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nXsAAAAASUVORK5CYII='))
+    [IO.File]::WriteAllBytes($Gif, [Convert]::FromBase64String(
+        'R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='))
     & (Join-Path $RepositoryRoot 'scripts\Generate-TestMedia.ps1') -DurationSeconds 10 -Resolution '320x180' -FfmpegDirectory $FfmpegDirectory -OutputDirectory $FixtureDirectory
     if ($LASTEXITCODE -ne 0) { throw 'Packaged FFmpeg fixture generation failed.' }
-    $Fixture = Get-ChildItem -LiteralPath $FixtureDirectory -File -Filter '*.mp4' | Select-Object -First 1
-    if ($null -eq $Fixture) { throw 'Packaged FFmpeg did not create the validation fixture.' }
-    & $Ffprobe -v error -protocol_whitelist file,pipe -show_entries 'stream=codec_name,codec_type' -of json -i $Fixture.FullName | Out-Null
+    $Fixture = Join-Path $FixtureDirectory 'flash-click-320x180-10s.mp4'
+    if (-not (Test-Path -LiteralPath $Fixture -PathType Leaf)) { throw 'Packaged FFmpeg did not create the validation fixture.' }
+    foreach ($Media in @($Still, $Gif, $Fixture)) {
+        foreach ($Mode in @('default', 'classic-ascii', 'detailed-ascii', 'gradient', 'half-block')) {
+            & $Player --ffmpeg-dir $FfmpegDirectory --display-mode $Mode validate-media $Media
+            if ($LASTEXITCODE -ne 0) {
+                throw "Packaged player media validation failed for $([IO.Path]::GetFileName($Media)) in $Mode mode."
+            }
+        }
+    }
+    & $Player --ffmpeg-dir $FfmpegDirectory validate-media 'concat:https://example.invalid/video.mp4' 2>$null
+    if ($LASTEXITCODE -eq 0) { throw 'Packaged player unexpectedly accepted a nested network input.' }
+    & $Ffprobe -v error -protocol_whitelist file,pipe -show_entries 'stream=codec_name,codec_type' -of json -i $Fixture | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Packaged ffprobe could not inspect the generated fixture.' }
     & $Ffprobe -v error -protocol_whitelist file,pipe -i 'concat:https://example.invalid/video.mp4' 2>$null
     if ($LASTEXITCODE -eq 0) { throw 'Packaged FFmpeg unexpectedly accepted a nested network input.' }

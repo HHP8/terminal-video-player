@@ -17,7 +17,7 @@ cargo test --all-targets --locked
 git diff --check
 ```
 
-GitHub Actions repeats the four Cargo checks on `windows-2022` with read-only
+GitHub Actions repeats the four Cargo checks on `windows-2025` with read-only
 repository permissions.
 
 ## FFmpeg integration checks
@@ -26,13 +26,10 @@ These tests are ignored by default because they require external FFmpeg tools
 and generated media:
 
 ```powershell
-.\scripts\Fetch-Ffmpeg.ps1
-.\scripts\Generate-TestMedia.ps1 -DurationSeconds 10
-$env:TERMINAL_VIDEO_PLAYER_FFMPEG_DIR = `
-  (Resolve-Path '.\tools\ffmpeg').Path
-$env:TERMINAL_VIDEO_PLAYER_TEST_MEDIA = `
-  (Resolve-Path '.\.cache\test-media\flash-click-1920x1080-10s.mp4').Path
-cargo test --test ffmpeg_smoke --locked -- --ignored --nocapture
+.\scripts\Generate-TestMedia.ps1 -DurationSeconds 10 `
+  -FfmpegDirectory 'C:\path\to\reviewed\ffmpeg\bin'
+$env:TERMINAL_VIDEO_PLAYER_FFMPEG_DIR = 'C:\path\to\reviewed\ffmpeg\bin'
+cargo test --locked --all-targets -- --include-ignored
 ```
 
 The integration suite covers Unicode-path video/audio decoding, cancellation
@@ -59,13 +56,16 @@ generated reports.
 
 ## Current environment boundary
 
-The 2026-08-26 local release-preparation shell can run Rust formatting and the
-external FFmpeg tools, but it cannot link Rust test binaries: the installed
-MSVC toolchain has no Visual Studio linker/Windows SDK configured, and the local
-GNU toolchain includes `dlltool.exe` but not the assembler that it invokes.
-Compilation, Clippy, and Rust tests must not be reported as locally passing in
-this shell. The hosted Windows CI result is the required executable validation
-before public visibility is enabled.
+The 2026-08-26 local release-preparation shell has no usable Rust toolchain,
+Visual Studio linker, or Windows SDK. Compilation, formatting, Clippy, and Rust
+tests must not be reported as locally passing in this shell. The hosted Windows
+CI result is required before a version tag can be created.
+
+The portable workflow additionally builds FFmpeg twice from pinned source,
+audits configuration and licenses, builds the player twice, assembles two
+packages, runs clean-extraction runtime tests in a Unicode path, and requires
+bit-for-bit identical binaries and all seven release assets. Only the final
+tag-only job has write permission.
 
 ## Remaining limitations and manual checks
 
@@ -73,7 +73,8 @@ before public visibility is enabled.
 - Measure synchronization recovery after repeated forward and backward seeks.
 - Repeat live 120x40 and 200x60 terminal-paint benchmarks for ten minutes.
 - Exercise physical Ctrl+C, audio-device removal, child crash, and console close.
-- Test combining-mark, UNC, and near-long-path media paths.
-- Validate any future MSVC binary on a clean Windows 11 x64 system. No binary is
-  created or published by this source release.
+- Test combining-mark and near-long-path media paths. Automated Windows tests
+  reject UNC syntax before filesystem access and accept canonical local files.
+- Validate the unsigned MSVC binary on additional clean Windows 10 and Windows
+  11 x64 systems outside the hosted-runner environment.
 - Hard process termination cannot run RAII terminal restoration.

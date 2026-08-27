@@ -14,6 +14,26 @@ const MAX_GIF_HEIGHT: u32 = 4_096;
 const MAX_GIF_FRAMES: usize = 10_000;
 const MAX_GIF_DECODED_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_GIF_DECODER_ALLOC: u64 = 256 * 1024 * 1024;
+const MAX_STILL_WIDTH: u32 = 4_096;
+const MAX_STILL_HEIGHT: u32 = 4_096;
+const MAX_STILL_DECODER_ALLOC: u64 = 128 * 1024 * 1024;
+
+#[derive(Clone, Copy, Debug)]
+struct StillLimits {
+    max_width: u32,
+    max_height: u32,
+    max_decoder_alloc: u64,
+}
+
+impl Default for StillLimits {
+    fn default() -> Self {
+        Self {
+            max_width: MAX_STILL_WIDTH,
+            max_height: MAX_STILL_HEIGHT,
+            max_decoder_alloc: MAX_STILL_DECODER_ALLOC,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct GifLimits {
@@ -56,6 +76,20 @@ pub fn load_image_source(path: &Path) -> Result<ImageSource> {
     if reader.format() == Some(image::ImageFormat::Gif) {
         return load_gif(path);
     }
+
+    load_still_with_limits(path, StillLimits::default())
+}
+
+fn load_still_with_limits(path: &Path, limits: StillLimits) -> Result<ImageSource> {
+    let mut reader = image::ImageReader::open(path)
+        .with_context(|| format!("opening image {}", path.display()))?
+        .with_guessed_format()
+        .context("guessing image format")?;
+    let mut decoder_limits = Limits::default();
+    decoder_limits.max_image_width = Some(limits.max_width);
+    decoder_limits.max_image_height = Some(limits.max_height);
+    decoder_limits.max_alloc = Some(limits.max_decoder_alloc);
+    reader.limits(decoder_limits);
 
     let image = reader
         .decode()
@@ -151,6 +185,21 @@ mod tests {
     use super::*;
     use image::codecs::gif::{GifEncoder, Repeat};
     use image::{Delay, Frame, Rgba, RgbaImage};
+
+    #[test]
+    fn still_decode_rejects_dimensions_over_the_configured_limit() {
+        let temporary = tempfile::tempdir().expect("temporary directory");
+        let path = temporary.path().join("wide.png");
+        RgbaImage::from_pixel(2, 1, Rgba([255, 0, 0, 255]))
+            .save(&path)
+            .expect("encode PNG");
+
+        let limits = StillLimits {
+            max_width: 1,
+            ..StillLimits::default()
+        };
+        assert!(load_still_with_limits(&path, limits).is_err());
+    }
 
     #[test]
     fn gif_preserves_per_frame_delays() {

@@ -52,19 +52,33 @@ and the review method and license-choice notes are in
 [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
 
 Each dependency remains subject to its own license. This notice does not claim
-ownership of dependency source, documentation, or trademarks.
+ownership of dependency source, documentation, or trademarks. Portable
+packages include the exact release graph's detected license and notice files,
+plus their hashed inventory, under `licenses/Rust`.
 
 ## FFmpeg
 
-Terminal Video Player invokes separately installed `ffmpeg.exe` and
-`ffprobe.exe` processes. It does not link to FFmpeg libraries, and this
-repository does not distribute FFmpeg executables, DLLs, codecs, archives, or
-portable packages.
+Terminal Video Player invokes `ffmpeg.exe` and `ffprobe.exe` as independent
+processes and does not link to FFmpeg libraries. Portable prereleases build
+FFmpeg 9.0.1 from verified official upstream source using only the reviewed
+built-in LGPL-compatible component allowlist. GPL, nonfree, version3, network,
+external codec-library, TLS, and hardware-acceleration enablement are rejected.
 
-The optional local setup helper downloads the exact external build described in
-[`third-party/ffmpeg-artifact.json`](third-party/ffmpeg-artifact.json). FFmpeg's
-license and redistribution obligations depend on the exact build configuration
-and enabled third-party libraries. The manifest's LGPL-oriented flags and hash
-checks are useful provenance controls, but they do not establish a sufficient
-basis for redistributing that binary build. See
-[`docs/FFMPEG.md`](docs/FFMPEG.md).
+FFmpeg is copyright its contributors and is distributed under the GNU Lesser
+General Public License version 2.1 or later for this reviewed configuration.
+The portable ZIP includes FFmpeg's license and notices. The same GitHub
+prerelease includes the exact corresponding-source archive, detached signature,
+build scripts, configuration, audit evidence, rebuild instructions, and
+hashes. See [`docs/FFMPEG.md`](docs/FFMPEG.md). This project does not claim
+ownership of or affiliation with FFmpeg.
+
+## llvm-mingw build toolchain
+
+The FFmpeg cross-build uses the pinned llvm-mingw 20260616 UCRT toolchain with
+LLVM 22.1.8. LLVM, Clang, LLD, and compiler-rt are covered by Apache-2.0 WITH
+LLVM-exception. The incorporated mingw-w64 headers, startup code, and runtime
+materials retain their ZPL-2.1 and collected permissive runtime terms. Exact
+source revisions and artifact license paths are recorded in
+[`third-party/ffmpeg-artifact.json`](third-party/ffmpeg-artifact.json), and the
+applicable license files are included in each portable ZIP and corresponding-
+source bundle.

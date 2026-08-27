@@ -34,7 +34,7 @@ done
     exit 65
 }
 
-for command_name in curl gpg jq make sha256sum tar xz; do
+for command_name in curl gpg jq make realpath sha256sum tar xz; do
     command -v "$command_name" >/dev/null || {
         echo "Required preinstalled command is missing: $command_name" >&2
         exit 69
@@ -51,7 +51,8 @@ case "$output_root" in
 esac
 
 rm -rf -- "$work_root" "$output_root"
-mkdir -p -- "$work_root/downloads" "$work_root/extracted" "$output_root/bin" \
+mkdir -p -- "$work_root/downloads" "$work_root/extracted/source" \
+    "$work_root/extracted/toolchain" "$output_root/bin" \
     "$output_root/licenses/ffmpeg" "$output_root/licenses/toolchain" "$output_root/provenance"
 
 json_value() { jq -er "$1" "$2"; }
@@ -72,18 +73,6 @@ download_verified() {
     mv -- "$partial" "$destination"
 }
 
-assert_safe_tar() {
-    local archive="$1"
-    local entries="$work_root/tar-entries.txt"
-    tar -tf "$archive" > "$entries"
-    while IFS= read -r entry; do
-        [[ -n "$entry" ]] || continue
-        case "$entry" in
-            /*|*\\*|[A-Za-z]:*|../*|*/../*|*/..|..) echo "Unsafe archive entry: $entry" >&2; exit 1 ;;
-        esac
-    done < "$entries"
-}
-
 source_name="$(json_value '.ffmpeg.source_archive.name' "$metadata_path")"
 source_url="$(json_value '.ffmpeg.source_archive.url' "$metadata_path")"
 source_size="$(json_value '.ffmpeg.source_archive.size_bytes' "$metadata_path")"
@@ -102,6 +91,8 @@ toolchain_hash="$(json_value '.toolchain.artifact.sha256' "$metadata_path")"
 target="$(json_value '.toolchain.target' "$metadata_path")"
 
 repo_root="$(cd "$(dirname "$metadata_path")/.." && pwd -P)"
+tar_validator="$repo_root/scripts/release/Validate-TarArchive.sh"
+[[ -x "$tar_validator" ]] || { echo 'Tar archive validator is missing or not executable.' >&2; exit 1; }
 signing_key="$repo_root/$key_relative"
 [[ -f "$signing_key" ]] || { echo "Vendored signing key is missing." >&2; exit 1; }
 printf '%s  %s\n' "$key_hash" "$signing_key" | sha256sum --check --strict
@@ -123,14 +114,29 @@ actual_fingerprint="$(GNUPGHOME="$gnupg_home" gpg --batch --with-colons --finger
 }
 GNUPGHOME="$gnupg_home" gpg --batch --verify "$source_signature" "$source_archive"
 
-assert_safe_tar "$source_archive"
-assert_safe_tar "$toolchain_archive"
-tar -xf "$source_archive" -C "$work_root/extracted" --no-same-owner --no-same-permissions
-tar -xf "$toolchain_archive" -C "$work_root/extracted" --no-same-owner --no-same-permissions
+source_root="${source_name%.tar.xz}"
+toolchain_root="${toolchain_name%.tar.xz}"
+"$tar_validator" "$source_archive" "$source_root"
+"$tar_validator" "$toolchain_archive" "$toolchain_root"
+tar -xf "$source_archive" -C "$work_root/extracted/source" --no-same-owner --no-same-permissions
+tar -xf "$toolchain_archive" -C "$work_root/extracted/toolchain" --no-same-owner --no-same-permissions
 
-source_dir="$work_root/extracted/ffmpeg-$(json_value '.ffmpeg.version' "$metadata_path")"
-toolchain_dir="$(find "$work_root/extracted" -mindepth 1 -maxdepth 1 -type d -name 'llvm-mingw-*' -print -quit)"
-[[ -d "$source_dir" && -n "$toolchain_dir" && -d "$toolchain_dir" ]] || {
+if [[ -n "$(find "$work_root/extracted" ! -type d ! -type f ! -type l -print -quit)" ]]; then
+    echo 'Extracted archives contain a special filesystem entry.' >&2
+    exit 1
+fi
+for extracted_root in "$work_root/extracted/source" "$work_root/extracted/toolchain"; do
+    while IFS= read -r -d '' link_path; do
+        resolved="$(realpath -m -- "$link_path")"
+        [[ "$resolved" == "$extracted_root/"* ]] || {
+            echo "Extracted symbolic link escapes its archive root: $link_path" >&2
+            exit 1
+        }
+    done < <(find "$extracted_root" -type l -print0)
+done
+source_dir="$work_root/extracted/source/$source_root"
+toolchain_dir="$work_root/extracted/toolchain/$toolchain_root"
+[[ -d "$source_dir" && -d "$toolchain_dir" ]] || {
     echo "Verified archives did not produce the expected source and toolchain directories." >&2
     exit 1
 }
@@ -207,12 +213,35 @@ while IFS=$'\t' read -r artifact_path output_name; do
     cp -- "$license_source" "$output_root/licenses/toolchain/$output_name"
 done < <(jq -er '.toolchain.licenses[] | [.artifact_path, .output_name] | @tsv' "$metadata_path")
 
+ffmpeg_imports="$("${cross_prefix}objdump" -p "$output_root/bin/ffmpeg.exe" | awk '/DLL Name:/ { print $3 }' | sort -u | jq -R -s 'split("\n") | map(select(length > 0))')"
+ffprobe_imports="$("${cross_prefix}objdump" -p "$output_root/bin/ffprobe.exe" | awk '/DLL Name:/ { print $3 }' | sort -u | jq -R -s 'split("\n") | map(select(length > 0))')"
+jq -n --argjson ffmpeg "$ffmpeg_imports" --argjson ffprobe "$ffprobe_imports" \
+    '{"ffmpeg.exe":$ffmpeg,"ffprobe.exe":$ffprobe}' > "$output_root/provenance/PE-IMPORTS.json"
+
+strings_evidence="$output_root/provenance/BINARY-STRINGS-SCAN.txt"
+: > "$strings_evidence"
+for executable_name in ffmpeg.exe ffprobe.exe; do
+    strings_output="$work_root/${executable_name}.strings"
+    "${cross_prefix}strings" "$output_root/bin/$executable_name" > "$strings_output"
+    for forbidden_path in '/home/runner/' 'C:\Users\' 'GITHUB_WORKSPACE' 'RUNNER_TEMP'; do
+        if grep -F -- "$forbidden_path" "$strings_output" >/dev/null; then
+            echo "Embedded build-host path marker found in $executable_name: $forbidden_path" >&2
+            exit 1
+        fi
+    done
+    echo "$executable_name: no forbidden build-host path markers" >> "$strings_evidence"
+done
+
 {
     echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
     echo "SOURCE_SHA256=$source_hash"
     echo "SOURCE_COMMIT=$(json_value '.ffmpeg.source_commit' "$metadata_path")"
     echo "TOOLCHAIN_SHA256=$toolchain_hash"
     echo "TOOLCHAIN_COMMIT=$(json_value '.toolchain.source_commit' "$metadata_path")"
+    echo "MINGW_W64_SOURCE_COMMIT=$(json_value '.toolchain.licenses[] | select(.component == "mingw-w64 headers and startup code") | .source_commit' "$metadata_path")"
+    echo "COMPILER_RT_SOURCE_COMMIT=$(json_value '.toolchain.licenses[] | select(.component == "LLVM, Clang, LLD, and compiler-rt") | .source_commit' "$metadata_path")"
+    echo "WINDRES_VERSION=$(${cross_prefix}windres --version | head -n 1)"
+    echo "ASSEMBLER_VERSION=$(${cross_prefix}as --version | head -n 1)"
     "${cross_prefix}clang" --version
     "${cross_prefix}ld" --version
     "${cross_prefix}ar" --version

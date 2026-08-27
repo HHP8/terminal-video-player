@@ -132,16 +132,24 @@ foreach ($Flag in @('--disable-everything', '--disable-network', '--disable-shar
     if ($Flag -notin @($Metadata.build.configuration_flags)) { throw "Required FFmpeg flag is missing: $Flag" }
 }
 Assert-SortedUniqueStrings @($Metadata.package.runtime_files) 'Portable runtime files'
+Assert-SortedUniqueStrings @($Metadata.package.runtime_prefixes) 'Portable runtime prefixes'
+foreach ($Prefix in @($Metadata.package.runtime_prefixes)) {
+    if (-not ([string]$Prefix).EndsWith('/', [StringComparison]::Ordinal) -or
+        [IO.Path]::IsPathRooted([string]$Prefix) -or ([string]$Prefix).Contains('..')) {
+        throw "Portable runtime prefix is unsafe: $Prefix"
+    }
+}
 Assert-SortedUniqueStrings @($Metadata.package.published_asset_suffixes) 'Published asset suffixes'
 
 if ($Components.schema -ne 1) { throw 'FFmpeg component schema must equal 1.' }
 Assert-ExactProperties $Components @(
     'schema', 'libraries', 'protocols', 'demuxers', 'decoders', 'parsers',
-    'encoders', 'muxers', 'filters', 'indevs', 'allowed_pe_imports'
+    'encoders', 'muxers', 'filters', 'indevs', 'allowed_pe_imports',
+    'allowed_player_pe_imports'
 ) 'FFmpeg components'
 foreach ($Property in @(
     'libraries', 'protocols', 'demuxers', 'decoders', 'parsers', 'encoders',
-    'muxers', 'filters', 'indevs', 'allowed_pe_imports'
+    'muxers', 'filters', 'indevs', 'allowed_pe_imports', 'allowed_player_pe_imports'
 )) {
     Assert-SortedUniqueStrings @($Components.$Property) "FFmpeg $Property"
 }

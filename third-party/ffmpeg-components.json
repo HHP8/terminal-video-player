@@ -27,5 +27,19 @@
     "ole32.dll",
     "SHELL32.dll",
     "USER32.dll"
+  ],
+  "allowed_player_pe_imports": [
+    "ADVAPI32.dll",
+    "bcrypt.dll",
+    "KERNEL32.dll",
+    "ntdll.dll",
+    "ole32.dll",
+    "OLEAUT32.dll",
+    "PROPSYS.dll",
+    "SHELL32.dll",
+    "USER32.dll",
+    "VERSION.dll",
+    "WINMM.dll",
+    "WS2_32.dll"
   ]
 }

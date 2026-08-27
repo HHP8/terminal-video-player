@@ -23,6 +23,16 @@ They are not installers and must not be assembled or uploaded manually.
 7. Update the corresponding-source and portable documentation with the exact
    supported and disabled functionality. A broader upstream FFmpeg claim must
    never be copied into the portable package documentation.
+8. Review the resolved `ImageOS`, `ImageVersion`, compiler, linker, assembler,
+   resource compiler, compiler-rt and mingw-w64 source revisions, Make, GnuPG,
+   tar, xz, and jq versions captured by both builds. Hosted runner
+   labels are not immutable image digests, so a runner-image change requires a
+   new manual validation and evidence review even when source hashes are stable.
+9. Review the generated Rust dependency license bundle. Every package in the
+   `x86_64-pc-windows-msvc` normal/build release graph must match the reviewed
+   inventory and have detected license or notice files. Development-only and
+   irrelevant target packages must be absent, and the portable manifest must
+   hash every bundled file under `licenses/Rust`.
 
 Hash changes require evidence that the upstream identity changed for an
 expected reason. Never rotate a hash merely to make a failed download pass.
@@ -38,6 +48,11 @@ Confirm that the ordinary CI workflow also succeeds at the same commit. Review
 the exact staged files and diff, secret and privacy scans, Persian/Arabic scan,
 non-ASCII review, package allowlists, ignored artifacts, workflow permissions,
 and action commit pins before pushing a release commit.
+
+The manual run must be launched from the exact `main` commit intended for the
+tag. Compare both FFmpeg binaries, both player binaries, both portable ZIPs,
+both corresponding-source bundles, manifests, SBOMs, and provenance records.
+Any unexplained byte difference is a publication blocker.
 
 ## Publishing
 

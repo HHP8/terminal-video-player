@@ -4,10 +4,11 @@ param()
 $ErrorActionPreference = 'Stop'
 $RepoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
 $BuilderPath = Join-Path $RepoRoot 'scripts\release\build-ffmpeg.sh'
+$TarValidatorPath = Join-Path $RepoRoot 'scripts\release\Validate-TarArchive.sh'
 $AuditorPath = Join-Path $RepoRoot 'scripts\release\Audit-Ffmpeg.ps1'
 $LegacyFetcherPath = Join-Path $RepoRoot 'scripts\Fetch-Ffmpeg.ps1'
 
-foreach ($RequiredPath in @($BuilderPath, $AuditorPath)) {
+foreach ($RequiredPath in @($BuilderPath, $TarValidatorPath, $AuditorPath)) {
     if (-not (Test-Path -LiteralPath $RequiredPath -PathType Leaf)) {
         throw "Required FFmpeg release program is missing: $RequiredPath"
     }
@@ -28,9 +29,16 @@ foreach ($RequiredTerm in @(
     '--no-insert-timestamp',
     'gpg --batch --verify',
     'sha256sum --check',
-    'tar -tf'
+    'Validate-TarArchive.sh'
     '.toolchain.licenses[]'
     'licenses/toolchain'
+    'objdump'
+    'PE-IMPORTS.json'
+    'BINARY-STRINGS-SCAN.txt'
+    'WINDRES_VERSION='
+    'ASSEMBLER_VERSION='
+    'MINGW_W64_SOURCE_COMMIT='
+    'COMPILER_RT_SOURCE_COMMIT='
 )) {
     if (-not $Builder.Contains($RequiredTerm, [StringComparison]::Ordinal)) {
         throw "FFmpeg builder is missing required policy term: $RequiredTerm"
@@ -51,7 +59,7 @@ if ($HashIndex -lt 0 -or $ExtractIndex -lt 0 -or $HashIndex -gt $ExtractIndex) {
 $Auditor = Get-Content -LiteralPath $AuditorPath -Raw
 foreach ($RequiredTerm in @(
     '-buildconf', '-version', '-L', '-protocols', '-formats', '-decoders',
-    '-encoders', '-filters', '-devices', 'allowed_pe_imports',
+    '-encoders', '-filters', '-devices', 'allowed_pe_imports', 'PE-IMPORTS.json',
     '--enable-gpl', '--enable-nonfree', '--enable-version3'
 )) {
     if (-not $Auditor.Contains($RequiredTerm, [StringComparison]::Ordinal)) {

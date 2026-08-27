@@ -79,8 +79,13 @@ $HashFiles = @(Get-TreeManifest -Root $Stage -Exclude @('SHA256SUMS'))
 Set-Content -LiteralPath (Join-Path $Stage 'SHA256SUMS') -Value @($HashFiles | ForEach-Object { "$($_.sha256)  $($_.path)" }) -Encoding utf8NoBOM
 
 $ArchivePath = Join-Path $OutputDirectory "$AssetStem-ffmpeg-corresponding-source.zip"
-New-DeterministicZip -SourceDirectory $Stage -DestinationPath $ArchivePath
+New-DeterministicZip -SourceDirectory $Stage -DestinationPath $ArchivePath -ExecutablePaths @(
+    'scripts/release/build-ffmpeg.sh',
+    'scripts/release/Validate-TarArchive.sh',
+    'scripts/release/tests/Test-SafeTar.Tests.sh'
+)
 $ArchiveHash = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 Set-Content -LiteralPath "$ArchivePath.sha256" -Value "$ArchiveHash  $(Split-Path $ArchivePath -Leaf)" -Encoding ascii
+Remove-Item -LiteralPath $Stage -Recurse -Force
 Write-Host "Corresponding-source ZIP created: $ArchivePath"
 Write-Host "Corresponding-source ZIP SHA-256: $ArchiveHash"

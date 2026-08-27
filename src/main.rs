@@ -8,6 +8,7 @@ use terminal_video_player::cli::{Cli, Command};
 use terminal_video_player::diagnostics;
 use terminal_video_player::media::FfmpegPaths;
 use terminal_video_player::playback;
+use terminal_video_player::platform::windows::validate_local_media_path;
 use terminal_video_player::render::{ColorCapability, DisplayMode, benchmark};
 use terminal_video_player::terminal::{
     DisplayModePolicy, MenuOutcome, TerminalSession, force_restore_terminal, install_panic_hook,
@@ -25,7 +26,7 @@ fn main() {
 fn run() -> Result<()> {
     let cli = Cli::parse();
 
-    match cli.command {
+    match cli.command.as_ref() {
         Some(Command::RestoreTerminal) => {
             force_restore_terminal();
             println!("Terminal state reset sequence sent.");
@@ -36,6 +37,20 @@ fn run() -> Result<()> {
             if !diagnostics::print(ffmpeg.as_ref()) {
                 anyhow::bail!("the configured FFmpeg runtime is missing or incompatible");
             }
+            return Ok(());
+        }
+        Some(Command::ValidateMedia { path }) => {
+            let input = validate_local_media_path(path)?;
+            let display_mode = cli
+                .display_mode
+                .map(Into::into)
+                .unwrap_or(DisplayMode::Default);
+            playback::validate_media(&input, &cli, display_mode)?;
+            println!(
+                "Media validation passed: {} ({})",
+                input.display(),
+                display_mode.label()
+            );
             return Ok(());
         }
         Some(Command::Benchmark {
@@ -54,11 +69,11 @@ fn run() -> Result<()> {
                 .unwrap_or(DisplayMode::Default);
             return benchmark::run(
                 benchmark::BenchmarkConfig {
-                    seconds,
-                    live,
-                    strategy: renderer.into(),
-                    pattern,
-                    target_fps,
+                    seconds: *seconds,
+                    live: *live,
+                    strategy: (*renderer).into(),
+                    pattern: *pattern,
+                    target_fps: *target_fps,
                     display_mode,
                     color: ColorCapability::resolve(cli.color),
                 },
@@ -74,15 +89,13 @@ fn run() -> Result<()> {
         .as_deref()
         .context("a local image, GIF, or video path is required")?;
 
-    if !input.exists() {
-        anyhow::bail!("input does not exist: {}", input.display());
-    }
+    let input = validate_local_media_path(input)?;
     if !std::io::stdout().is_terminal() {
         anyhow::bail!(
             "stdout is not an interactive terminal; run this command in Windows Terminal"
         );
     }
-    let media = playback::prepare(input, &cli).context("preparing media input")?;
+    let media = playback::prepare(&input, &cli).context("preparing media input")?;
     let display_policy = selection_policy(
         cli.display_mode.map(Into::into),
         media.is_video(),

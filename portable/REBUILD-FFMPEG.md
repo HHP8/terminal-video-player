@@ -9,7 +9,7 @@ On a clean Ubuntu 24.04 x86-64 environment, set `SOURCE_DATE_EPOCH` to the
 tagged Terminal Video Player commit timestamp and run:
 
 ```bash
-scripts/release/build-ffmpeg.sh \
+bash scripts/release/build-ffmpeg.sh \
   --metadata third-party/ffmpeg-artifact.json \
   --components third-party/ffmpeg-components.json \
   --work /tmp/terminal-video-player-ffmpeg-rebuild \

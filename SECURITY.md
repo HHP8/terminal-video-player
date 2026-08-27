@@ -2,9 +2,9 @@
 
 ## Supported versions
 
-Security fixes are applied to the current `main` branch. This proof of concept
-does not currently promise maintenance for older commits, tags, or local binary
-builds.
+Security fixes are applied to the current `main` branch and the latest portable
+prerelease. This proof of concept does not promise maintenance for older
+commits, tags, prereleases, or user-built binaries.
 
 ## Reporting a vulnerability
 
@@ -24,8 +24,9 @@ disclosure.
 
 ## Scope notes
 
-The repository publishes source only. FFmpeg binaries, DLLs, codecs, downloaded
-archives, portable packages, installers, and user-built executables are not
-project-distributed artifacts. Reports about an upstream FFmpeg build should be
-sent to the responsible upstream project unless Terminal Video Player's own
-configuration or invocation creates the vulnerability.
+The historical `v0.1.0` prerelease is source-only. Later tagged portable
+prereleases may contain the project executable plus the specifically audited
+FFmpeg tools built by this repository's workflow. Reports about the packaging
+workflow, bundled configuration, executable resolution, archive validation, or
+invocation policy are in scope. Vulnerabilities solely in upstream FFmpeg
+should also be reported to FFmpeg through its published security process.

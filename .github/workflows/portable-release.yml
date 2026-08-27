@@ -1,0 +1,435 @@
+name: Source-built FFmpeg portable prerelease
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portable-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
+  RUST_BACKTRACE: '1'
+
+jobs:
+  metadata:
+    name: Source and metadata validation
+    runs-on: windows-2025
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      epoch: ${{ steps.identity.outputs.epoch }}
+      commit: ${{ steps.identity.outputs.commit }}
+    steps:
+      - name: Check out the exact workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release identity
+        id: identity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Cargo = Get-Content Cargo.toml -Raw
+          if ($Cargo -notmatch '(?m)^version = "(?<version>\d+\.\d+\.\d+)"$') { throw 'Cargo package version is invalid.' }
+          $Version = $Matches.version
+          if ('${{ github.ref_type }}' -eq 'tag' -and '${{ github.ref_name }}' -cne "v$Version") {
+            throw 'The version tag must exactly match Cargo.toml.'
+          }
+          $Commit = (git rev-parse HEAD).Trim()
+          if ($Commit -cne '${{ github.sha }}') { throw 'Checkout does not match the workflow commit.' }
+          $Epoch = (git show -s --format=%ct HEAD).Trim()
+          if ($Epoch -notmatch '^\d+$') { throw 'Commit timestamp is invalid.' }
+          "version=$Version" >> $env:GITHUB_OUTPUT
+          "epoch=$Epoch" >> $env:GITHUB_OUTPUT
+          "commit=$Commit" >> $env:GITHUB_OUTPUT
+
+      - name: Run repository release-policy tests
+        shell: pwsh
+        run: |
+          ./scripts/release/tests/Test-ReleaseMetadata.Tests.ps1
+          ./scripts/release/tests/Test-FfmpegBuildPolicy.Tests.ps1
+          ./scripts/release/tests/Test-PeImports.Tests.ps1
+          ./scripts/release/tests/Test-Packaging.Tests.ps1
+          ./scripts/release/tests/Test-Reproducibility.Tests.ps1
+          ./scripts/release/tests/Test-WorkflowPolicy.Tests.ps1
+          git diff --check
+
+  rust-quality:
+    name: Terminal Video Player checks and tests
+    needs: metadata
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - name: Check out the exact workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install the repository-pinned Rust toolchain
+        shell: pwsh
+        run: rustup toolchain install 1.97.1-x86_64-pc-windows-msvc --profile minimal --component rustfmt,clippy --no-self-update
+      - name: Run established quality gates
+        shell: pwsh
+        run: |
+          cargo fmt --all -- --check
+          cargo check --all-targets --locked
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo test --all-targets --locked
+
+  ffmpeg-build:
+    name: FFmpeg source build (${{ matrix.replica }})
+    needs: metadata
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        replica: [a, b]
+    steps:
+      - name: Check out the exact workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Build verified minimal FFmpeg
+        env:
+          SOURCE_DATE_EPOCH: ${{ needs.metadata.outputs.epoch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/release/tests/Test-SafeTar.Tests.sh
+          ./scripts/release/build-ffmpeg.sh \
+            --metadata "$GITHUB_WORKSPACE/third-party/ffmpeg-artifact.json" \
+            --components "$GITHUB_WORKSPACE/third-party/ffmpeg-components.json" \
+            --work "/tmp/terminal-video-player-ffmpeg-build" \
+            --output "$RUNNER_TEMP/ffmpeg-output"
+          cd "$RUNNER_TEMP/ffmpeg-output"
+          sha256sum --check SHA256SUMS
+      - name: Upload FFmpeg build evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ffmpeg-build-${{ matrix.replica }}
+          path: ${{ runner.temp }}/ffmpeg-output
+          if-no-files-found: error
+          retention-days: 7
+
+  ffmpeg-reproducibility:
+    name: Compare FFmpeg replicas before execution
+    needs: ffmpeg-build
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - name: Check out the exact workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download FFmpeg replica A
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ffmpeg-build-a
+          path: ${{ runner.temp }}/ffmpeg-a
+      - name: Download FFmpeg replica B
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ffmpeg-build-b
+          path: ${{ runner.temp }}/ffmpeg-b
+      - name: Require bit-for-bit FFmpeg reproducibility
+        shell: pwsh
+        run: |
+          ./scripts/release/Compare-DirectoryReplicas.ps1 `
+            -ReplicaA '${{ runner.temp }}/ffmpeg-a' -ReplicaB '${{ runner.temp }}/ffmpeg-b' `
+            -OutputDirectory '${{ runner.temp }}/verified-ffmpeg'
+      - name: Upload verified FFmpeg build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: verified-ffmpeg-build
+          path: ${{ runner.temp }}/verified-ffmpeg
+          if-no-files-found: error
+          retention-days: 7
+
+  ffmpeg-audit:
+    name: FFmpeg license and component audit
+    needs: [metadata, ffmpeg-reproducibility]
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - name: Check out the exact workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download verified FFmpeg build
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: verified-ffmpeg-build
+          path: ${{ runner.temp }}/ffmpeg-output
+      - name: Audit runtime configuration, licenses, components, and PE imports
+        shell: pwsh
+        run: |
+          ./scripts/release/Audit-Ffmpeg.ps1 `
+            -BuildRoot '${{ runner.temp }}/ffmpeg-output' `
+            -MetadataPath ./third-party/ffmpeg-artifact.json `
+            -ComponentsPath ./third-party/ffmpeg-components.json `
+            -OutputDirectory '${{ runner.temp }}/ffmpeg-audit'
+      - name: Upload FFmpeg audit evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ffmpeg-audit
+          path: ${{ runner.temp }}/ffmpeg-audit
+          if-no-files-found: error
+          retention-days: 7
+
+  player-build:
+    name: Reproducible player build (${{ matrix.replica }})
+    needs: metadata
+    runs-on: windows-2025
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        replica: [a, b]
+    env:
+      RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=. -C link-arg=/Brepro
+      SOURCE_DATE_EPOCH: ${{ needs.metadata.outputs.epoch }}
+    steps:
+      - name: Check out the exact workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install the repository-pinned Rust toolchain
+        shell: pwsh
+        run: rustup toolchain install 1.97.1-x86_64-pc-windows-msvc --profile minimal --no-self-update
+      - name: Build and inspect the player
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo build --release --locked
+          $Output = '${{ runner.temp }}/player-output'
+          $Evidence = Join-Path $Output 'evidence'
+          $RustLicenses = Join-Path $Output 'rust-licenses'
+          New-Item -ItemType Directory -Path $Evidence -Force | Out-Null
+          Copy-Item ./target/release/terminal-video-player.exe (Join-Path $Output 'terminal-video-player.exe')
+          $Components = Get-Content ./third-party/ffmpeg-components.json -Raw | ConvertFrom-Json
+          ./scripts/release/Get-PeImports.ps1 `
+            -ExecutablePath (Join-Path $Output 'terminal-video-player.exe') `
+            -OutputPath (Join-Path $Evidence 'PLAYER-PE-IMPORTS.json') `
+            -AllowedImports @($Components.allowed_player_pe_imports)
+          $Binary = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes((Join-Path $Output 'terminal-video-player.exe')))
+          foreach ($Forbidden in @('C:\Users\', 'GITHUB_WORKSPACE', 'RUNNER_TEMP')) {
+            if ($Binary.Contains($Forbidden, [StringComparison]::OrdinalIgnoreCase)) { throw "Player contains a forbidden build-host marker: $Forbidden" }
+          }
+          Set-Content (Join-Path $Evidence 'PLAYER-BINARY-STRINGS-SCAN.txt') 'terminal-video-player.exe: no forbidden build-host path markers' -Encoding utf8NoBOM
+          (& rustc -Vv | Out-String).TrimEnd() | Set-Content (Join-Path $Evidence 'RUST-TOOLCHAIN.txt') -Encoding utf8NoBOM
+          cargo metadata --format-version 1 --locked --filter-platform x86_64-pc-windows-msvc | Set-Content (Join-Path $Evidence 'CARGO-METADATA.json') -Encoding utf8NoBOM
+          cargo tree --locked --target x86_64-pc-windows-msvc --edges normal,build --prefix none --format '{p}' |
+            Sort-Object -Unique | Set-Content (Join-Path $Evidence 'RUST-RELEASE-PACKAGES.txt') -Encoding utf8NoBOM
+          ./scripts/release/New-RustLicenseBundle.ps1 `
+            -MetadataPath (Join-Path $Evidence 'CARGO-METADATA.json') `
+            -ReleasePackageListPath (Join-Path $Evidence 'RUST-RELEASE-PACKAGES.txt') `
+            -OutputDirectory $RustLicenses
+          [ordered]@{
+            image_os = "$env:ImageOS"
+            image_version = "$env:ImageVersion"
+            image_release = "$env:ImageRelease"
+            runner_arch = "$env:RUNNER_ARCH"
+            runner_os = "$env:RUNNER_OS"
+          } | ConvertTo-Json | Set-Content (Join-Path $Evidence 'WINDOWS-RUNNER.json') -Encoding utf8NoBOM
+      - name: Upload player build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: player-build-${{ matrix.replica }}
+          path: ${{ runner.temp }}/player-output
+          if-no-files-found: error
+          retention-days: 7
+
+  package:
+    name: Assemble portable package (${{ matrix.replica }})
+    needs: [metadata, rust-quality, ffmpeg-reproducibility, ffmpeg-audit, player-build]
+    runs-on: windows-2025
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        replica: [a, b]
+    steps:
+      - name: Check out the exact workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download verified FFmpeg build
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: verified-ffmpeg-build
+          path: ${{ runner.temp }}/ffmpeg-output
+      - name: Download FFmpeg audit
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ffmpeg-audit
+          path: ${{ runner.temp }}/ffmpeg-audit
+      - name: Download matching player build
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: player-build-${{ matrix.replica }}
+          path: ${{ runner.temp }}/player-output
+      - name: Generate compliance records and deterministic assets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Version = '${{ needs.metadata.outputs.version }}'
+          $Epoch = [long]'${{ needs.metadata.outputs.epoch }}'
+          $Commit = '${{ needs.metadata.outputs.commit }}'
+          $Assets = '${{ runner.temp }}/release-assets'
+          $Provenance = Join-Path $Assets "terminal-video-player-v$Version-provenance.json"
+          ./scripts/release/New-Provenance.ps1 -RepositoryRoot . -Version $Version -Commit $Commit -SourceDateEpoch $Epoch `
+            -SubjectPaths @('${{ runner.temp }}/player-output/terminal-video-player.exe', '${{ runner.temp }}/ffmpeg-output/bin/ffmpeg.exe', '${{ runner.temp }}/ffmpeg-output/bin/ffprobe.exe') `
+            -OutputPath $Provenance
+          ./scripts/release/New-PortablePackage.ps1 -RepositoryRoot . -Version $Version -SourceDateEpoch $Epoch `
+            -PlayerExecutable '${{ runner.temp }}/player-output/terminal-video-player.exe' `
+            -PlayerEvidenceDirectory '${{ runner.temp }}/player-output/evidence' `
+            -RustLicenseDirectory '${{ runner.temp }}/player-output/rust-licenses' `
+            -FfmpegBuildRoot '${{ runner.temp }}/ffmpeg-output' -AuditDirectory '${{ runner.temp }}/ffmpeg-audit' `
+            -ProvenancePath $Provenance -OutputDirectory $Assets
+          ./scripts/release/New-CorrespondingSource.ps1 -RepositoryRoot . -Version $Version -SourceDateEpoch $Epoch `
+            -FfmpegBuildRoot '${{ runner.temp }}/ffmpeg-output' -AuditDirectory '${{ runner.temp }}/ffmpeg-audit' `
+            -OutputDirectory $Assets
+          ./scripts/release/New-Sbom.ps1 -RepositoryRoot . -Version $Version -Commit $Commit -SourceDateEpoch $Epoch `
+            -PackageManifestPath (Join-Path $Assets "terminal-video-player-v$Version-manifest.json") `
+            -RustDependencyInventoryPath '${{ runner.temp }}/player-output/rust-licenses/RUST-DEPENDENCIES.json' `
+            -ToolchainLicenseDirectory '${{ runner.temp }}/ffmpeg-output/licenses/toolchain' `
+            -OutputPath (Join-Path $Assets "terminal-video-player-v$Version-sbom.spdx.json")
+          $Expected = @((Get-Content ./third-party/ffmpeg-artifact.json -Raw | ConvertFrom-Json).package.published_asset_suffixes | ForEach-Object { "terminal-video-player-v$Version$_" } | Sort-Object -CaseSensitive)
+          $Actual = @((Get-ChildItem -LiteralPath $Assets -File).Name | Sort-Object -CaseSensitive)
+          if (($Actual -join "`n") -cne ($Expected -join "`n")) { throw 'Candidate release assets differ from the reviewed allowlist.' }
+      - name: Upload candidate release replica
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-assets-${{ matrix.replica }}
+          path: ${{ runner.temp }}/release-assets
+          if-no-files-found: error
+          retention-days: 7
+
+  reproducibility:
+    name: Compare isolated builds and release assets
+    needs: [metadata, package]
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - name: Check out the exact workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download replica A
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-assets-a
+          path: ${{ runner.temp }}/replica-a
+      - name: Download replica B
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-assets-b
+          path: ${{ runner.temp }}/replica-b
+      - name: Require bit-for-bit reproducibility
+        shell: pwsh
+        run: |
+          ./scripts/release/Compare-ReleaseReplicas.ps1 -MetadataPath ./third-party/ffmpeg-artifact.json `
+            -Version '${{ needs.metadata.outputs.version }}' -ReplicaA '${{ runner.temp }}/replica-a' `
+            -ReplicaB '${{ runner.temp }}/replica-b' -OutputDirectory '${{ runner.temp }}/verified-release-assets'
+      - name: Upload verified release assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: verified-release-assets
+          path: ${{ runner.temp }}/verified-release-assets
+          if-no-files-found: error
+          retention-days: 7
+
+  runtime-validation:
+    name: Clean Windows extraction and runtime validation
+    needs: [metadata, reproducibility]
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - name: Check out the exact workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download reproducible release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: verified-release-assets
+          path: ${{ runner.temp }}/release-assets
+      - name: Validate clean extracted package
+        shell: pwsh
+        run: |
+          $Version = '${{ needs.metadata.outputs.version }}'
+          ./scripts/release/Test-PortablePackage.ps1 -RepositoryRoot . `
+            -ArchivePath "${{ runner.temp }}/release-assets/terminal-video-player-v$Version-portable-windows-x86_64.zip" `
+            -MetadataPath ./third-party/ffmpeg-artifact.json `
+            -ExtractionDirectory '${{ runner.temp }}/portable validation path 漢字'
+      - name: Run established FFmpeg integration tests
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.97.1-x86_64-pc-windows-msvc --profile minimal --no-self-update
+          $Tools = '${{ runner.temp }}/portable validation path 漢字/tools/ffmpeg'
+          $FixtureDirectory = '${{ runner.temp }}/integration media path 漢字'
+          ./scripts/Generate-TestMedia.ps1 -DurationSeconds 10 -Resolution '1920x1080' `
+            -FfmpegDirectory $Tools -OutputDirectory $FixtureDirectory
+          $env:TERMINAL_VIDEO_PLAYER_FFMPEG_DIR = $Tools
+          $env:TERMINAL_VIDEO_PLAYER_TEST_MEDIA = Join-Path $FixtureDirectory 'flash-click-1920x1080-10s.mp4'
+          cargo test --test ffmpeg_smoke --locked -- --ignored --nocapture
+
+  publish:
+    name: Publish public prerelease
+    needs: [metadata, rust-quality, ffmpeg-build, ffmpeg-reproducibility, ffmpeg-audit, player-build, package, reproducibility, runtime-validation]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-2025
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the exact tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download verified release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: verified-release-assets
+          path: ${{ runner.temp }}/verified-release-assets
+      - name: Publish prerelease only after every gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RELEASE_TAG -cne "v$env:RELEASE_VERSION" -or $env:RELEASE_TAG -cnotmatch '^v\d+\.\d+\.\d+$') {
+            throw 'Unauthorized release tag.'
+          }
+          gh release view $env:RELEASE_TAG --repo '${{ github.repository }}' *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'The target GitHub release already exists.' }
+          $Assets = @(Get-ChildItem -LiteralPath '${{ runner.temp }}/verified-release-assets' -File | Sort-Object Name)
+          if ($Assets.Count -ne 7) { throw 'Verified publication inventory is incomplete.' }
+          gh release create $env:RELEASE_TAG @($Assets.FullName) --repo '${{ github.repository }}' `
+            --verify-tag --prerelease --title "Terminal Video Player $env:RELEASE_TAG" `
+            --notes-file "docs/releases/$env:RELEASE_TAG.md"

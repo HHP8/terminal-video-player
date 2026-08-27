@@ -43,7 +43,8 @@ flowchart LR
   strategy remain independent.
 - `terminal` owns raw mode, alternate-screen state, input events, batched writes,
   and idempotent restoration.
-- `platform::windows` owns hidden child creation and Job Object containment.
+- `platform::windows` owns local-drive path enforcement, hidden child creation,
+  and Job Object containment.
 
 The `media` contracts deliberately use Rust frames, PCM chunks, timestamps, and
 events rather than FFmpeg types. A future linked-FFmpeg backend can therefore
@@ -83,12 +84,15 @@ before raw mode or the alternate screen is entered. Decoder processes are
 started afterward in a kill-on-close Job Object. This keeps synchronous,
 potentially slow input validation out of altered terminal state.
 
-GIF decoding applies strict 4096x4096 dimension limits and a 256 MiB decoder
+PNG and JPEG decoding applies strict 4096x4096 dimension limits and a 128 MiB
+decoder allocation budget. GIF decoding applies the same dimension limits and a 256 MiB decoder
 allocation budget. Frames are decoded incrementally and rejected before
 retention when the animation would exceed 10,000 frames or 256 MiB of decoded
 RGB data. The resulting bounded frame vector remains in memory to support
 looping without reopening the source.
 
+UNC paths, device paths, and mapped network drives are rejected before path
+metadata is read; the same local-drive check is repeated after canonicalization.
 Every ffprobe, video-decoder, and audio-decoder input is preceded by
 `-protocol_whitelist file,pipe`. The top-level media path is local, and nested
 playlist or manifest resolution cannot opt into HTTP or other network

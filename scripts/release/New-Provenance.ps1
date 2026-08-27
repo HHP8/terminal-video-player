@@ -12,7 +12,6 @@ $ErrorActionPreference = 'Stop'
 $RepositoryRoot = [IO.Path]::GetFullPath($RepositoryRoot)
 $MetadataPath = Join-Path $RepositoryRoot 'third-party\ffmpeg-artifact.json'
 $Metadata = Get-Content -LiteralPath $MetadataPath -Raw | ConvertFrom-Json
-$Timestamp = [DateTimeOffset]::FromUnixTimeSeconds($SourceDateEpoch).UtcDateTime.ToString('yyyy-MM-ddTHH:mm:ssZ')
 
 $Subjects = @($SubjectPaths | Sort-Object -CaseSensitive | ForEach-Object {
     $Resolved = [IO.Path]::GetFullPath($_)
@@ -61,8 +60,6 @@ $Statement = [ordered]@{
             builder = [ordered]@{ id = 'https://github.com/actions/runner' }
             metadata = [ordered]@{
                 invocationId = "https://github.com/HHP8/terminal-video-player/actions/runs/$($env:GITHUB_RUN_ID ?? 'local')"
-                startedOn = $Timestamp
-                finishedOn = $Timestamp
             }
         }
     }

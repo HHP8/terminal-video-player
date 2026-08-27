@@ -93,6 +93,12 @@ pub enum Command {
     RestoreTerminal,
     /// Print environment, terminal, and configured FFmpeg diagnostics.
     Diagnostics,
+    /// Decode and render-check one local media file without entering terminal playback mode.
+    ValidateMedia {
+        /// Local image, GIF, or video path to validate.
+        #[arg(value_name = "PATH")]
+        path: PathBuf,
+    },
     /// Benchmark ANSI frame generation and optionally write frames live.
     Benchmark {
         /// Seconds per benchmark case.
@@ -203,5 +209,22 @@ mod tests {
         assert!(help.contains("detailed-ascii"));
         assert!(help.contains("gradient"));
         assert!(help.contains("half-block"));
+    }
+
+    #[test]
+    fn parses_noninteractive_media_validation_with_a_global_display_mode() {
+        let cli = Cli::try_parse_from([
+            "terminal-video-player",
+            "validate-media",
+            "fixture.mp4",
+            "--display-mode",
+            "half-block",
+        ])
+        .expect("release media validation command");
+        assert_eq!(cli.display_mode, Some(DisplayModeChoice::HalfBlock));
+        let Some(Command::ValidateMedia { path }) = cli.command else {
+            panic!("expected validate-media command");
+        };
+        assert_eq!(path, PathBuf::from("fixture.mp4"));
     }
 }

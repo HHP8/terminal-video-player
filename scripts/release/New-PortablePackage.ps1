@@ -4,6 +4,8 @@ param(
     [Parameter(Mandatory)] [ValidatePattern('^\d+\.\d+\.\d+$')] [string]$Version,
     [Parameter(Mandatory)] [long]$SourceDateEpoch,
     [Parameter(Mandatory)] [string]$PlayerExecutable,
+    [Parameter(Mandatory)] [string]$PlayerEvidenceDirectory,
+    [Parameter(Mandatory)] [string]$RustLicenseDirectory,
     [Parameter(Mandatory)] [string]$FfmpegBuildRoot,
     [Parameter(Mandatory)] [string]$AuditDirectory,
     [Parameter(Mandatory)] [string]$ProvenancePath,
@@ -41,6 +43,10 @@ Copy-RequiredFile (Join-Path $FfmpegBuildRoot 'licenses\ffmpeg\COPYING.LGPLv2.1'
 Copy-RequiredFile (Join-Path $FfmpegBuildRoot 'licenses\toolchain\LLVM-LICENSE.txt') 'licenses/Toolchain/LLVM-LICENSE.txt'
 Copy-RequiredFile (Join-Path $FfmpegBuildRoot 'licenses\toolchain\MINGW-W64-COPYING.txt') 'licenses/Toolchain/MINGW-W64-COPYING.txt'
 Copy-RequiredFile (Join-Path $FfmpegBuildRoot 'licenses\toolchain\MINGW-W64-RUNTIME.txt') 'licenses/Toolchain/MINGW-W64-RUNTIME.txt'
+foreach ($LicenseFile in Get-ChildItem -LiteralPath $RustLicenseDirectory -Recurse -File) {
+    $Relative = [IO.Path]::GetRelativePath($RustLicenseDirectory, $LicenseFile.FullName).Replace('\', '/')
+    Copy-RequiredFile $LicenseFile.FullName "licenses/Rust/$Relative"
+}
 
 foreach ($Name in @(
     'FFMPEG-BUILDCONF.txt', 'FFMPEG-COMPONENTS.json', 'FFMPEG-DECODERS.txt',
@@ -50,10 +56,13 @@ foreach ($Name in @(
 )) {
     Copy-RequiredFile (Join-Path $AuditDirectory $Name) "provenance/$Name"
 }
-foreach ($Name in @('CONFIGURE-COMMAND.txt', 'RUNNER.json', 'TOOLCHAIN.txt')) {
+foreach ($Name in @('BINARY-STRINGS-SCAN.txt', 'CONFIGURE-COMMAND.txt', 'RUNNER.json', 'TOOLCHAIN.txt')) {
     Copy-RequiredFile (Join-Path $FfmpegBuildRoot "provenance\$Name") "provenance/$Name"
 }
 Copy-RequiredFile $ProvenancePath 'provenance/PROVENANCE.json'
+foreach ($Name in @('PLAYER-BINARY-STRINGS-SCAN.txt', 'PLAYER-PE-IMPORTS.json', 'RUST-TOOLCHAIN.txt', 'WINDOWS-RUNNER.json')) {
+    Copy-RequiredFile (Join-Path $PlayerEvidenceDirectory $Name) "provenance/$Name"
+}
 
 $ManifestDirectory = Join-Path $Stage 'manifest'
 New-Item -ItemType Directory -Path $ManifestDirectory -Force | Out-Null
@@ -72,8 +81,21 @@ Set-Content -LiteralPath (Join-Path $ManifestDirectory 'SHA256SUMS') -Value $Has
 
 $ActualPaths = @((Get-TreeManifest -Root $Stage).path | Sort-Object -CaseSensitive)
 $ExpectedPaths = @($Metadata.package.runtime_files | ForEach-Object { [string]$_ } | Sort-Object -CaseSensitive)
-if (($ActualPaths -join "`n") -cne ($ExpectedPaths -join "`n")) {
+$ExpectedPrefixes = @($Metadata.package.runtime_prefixes | ForEach-Object { [string]$_ })
+$Missing = @($ExpectedPaths | Where-Object { $_ -notin $ActualPaths })
+$Unexpected = @($ActualPaths | Where-Object {
+    $Path = $_
+    $Path -notin $ExpectedPaths -and @($ExpectedPrefixes | Where-Object {
+        $Path.StartsWith($_, [StringComparison]::Ordinal)
+    }).Count -eq 0
+})
+if ($Missing.Count -ne 0 -or $Unexpected.Count -ne 0) {
     throw "Portable package inventory differs from its allowlist. Expected [$($ExpectedPaths -join ', ')], found [$($ActualPaths -join ', ')]."
+}
+foreach ($Prefix in $ExpectedPrefixes) {
+    if (@($ActualPaths | Where-Object { $_.StartsWith($Prefix, [StringComparison]::Ordinal) }).Count -eq 0) {
+        throw "Portable package is missing required allowlisted content under: $Prefix"
+    }
 }
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
@@ -83,6 +105,7 @@ Copy-Item -LiteralPath $InternalManifest -Destination $ExternalManifest
 New-DeterministicZip -SourceDirectory $Stage -DestinationPath $ArchivePath
 $ArchiveHash = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 Set-Content -LiteralPath "$ArchivePath.sha256" -Value "$ArchiveHash  $(Split-Path $ArchivePath -Leaf)" -Encoding ascii
+Remove-Item -LiteralPath $Stage -Recurse -Force
 
 Write-Host "Portable ZIP created: $ArchivePath"
 Write-Host "Portable ZIP SHA-256: $ArchiveHash"

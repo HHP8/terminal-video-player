@@ -3,8 +3,6 @@ param(
     [Parameter(Mandatory)] [string]$BuildRoot,
     [Parameter(Mandatory)] [string]$MetadataPath,
     [Parameter(Mandatory)] [string]$ComponentsPath,
-    [Parameter(Mandatory)] [string]$ObjdumpPath,
-    [Parameter(Mandatory)] [string]$StringsPath,
     [Parameter(Mandatory)] [string]$OutputDirectory
 )
 
@@ -16,8 +14,10 @@ $Components = Get-Content -LiteralPath $ComponentsPath -Raw | ConvertFrom-Json
 $Ffmpeg = Join-Path $BuildRoot 'bin\ffmpeg.exe'
 $Ffprobe = Join-Path $BuildRoot 'bin\ffprobe.exe'
 $ConfigComponents = Join-Path $BuildRoot 'provenance\config_components.h'
+$PeImportsPath = Join-Path $BuildRoot 'provenance\PE-IMPORTS.json'
+$StringsEvidence = Join-Path $BuildRoot 'provenance\BINARY-STRINGS-SCAN.txt'
 
-foreach ($Path in @($Ffmpeg, $Ffprobe, $ConfigComponents, $ObjdumpPath, $StringsPath)) {
+foreach ($Path in @($Ffmpeg, $Ffprobe, $ConfigComponents, $PeImportsPath, $StringsEvidence)) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "Required FFmpeg audit input is missing: $Path"
     }
@@ -26,6 +26,14 @@ if ((Get-ChildItem -LiteralPath (Join-Path $BuildRoot 'bin') -File -Filter '*.dl
     throw 'The FFmpeg build output unexpectedly contains DLL files.'
 }
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
+
+$SumsPath = Join-Path $BuildRoot 'SHA256SUMS'
+foreach ($Line in Get-Content -LiteralPath $SumsPath) {
+    if ($Line -cnotmatch '^(?<hash>[0-9a-f]{64})  \./(?<path>.+)$') { throw "Malformed FFmpeg build checksum line: $Line" }
+    $Path = Join-Path $BuildRoot $Matches.path.Replace('/', '\')
+    $Hash = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($Hash -cne $Matches.hash) { throw "FFmpeg build artifact hash mismatch: $($Matches.path)" }
+}
 
 function Invoke-Captured {
     param([string]$Executable, [string[]]$Arguments, [string]$Label)
@@ -100,27 +108,12 @@ foreach ($Entry in $Kinds.GetEnumerator()) {
     $Inventory[$Property] = $Actual
 }
 
-$PeInventory = [ordered]@{}
-foreach ($Executable in @($Ffmpeg, $Ffprobe)) {
-    $Dump = (& $ObjdumpPath -p $Executable 2>&1 | Out-String)
-    if ($LASTEXITCODE -ne 0) { throw "PE inspection failed for $Executable." }
-    $Imports = @(
-        $Dump -split "`r?`n" | ForEach-Object {
-            if ($_ -match '^\s*DLL Name:\s*(?<name>\S+)\s*$') { $Matches.name }
-        } | Sort-Object -Unique
-    )
+$PeInventory = Get-Content -LiteralPath $PeImportsPath -Raw | ConvertFrom-Json -AsHashtable
+foreach ($ExecutableName in @('ffmpeg.exe', 'ffprobe.exe')) {
+    $Imports = @($PeInventory[$ExecutableName] | Sort-Object -Unique)
     foreach ($Import in $Imports) {
         if ($Import -notin @($Components.allowed_pe_imports)) {
-            throw "Unexpected PE import in $(Split-Path $Executable -Leaf): $Import"
-        }
-    }
-    $PeInventory[(Split-Path $Executable -Leaf)] = $Imports
-
-    $Strings = (& $StringsPath $Executable 2>&1 | Out-String)
-    if ($LASTEXITCODE -ne 0) { throw "Printable-string inspection failed for $Executable." }
-    foreach ($Pattern in @('/home/runner/', '/Users/', 'C:\\Users\\', 'RUNNER_TEMP', 'GITHUB_WORKSPACE')) {
-        if ($Strings -match [regex]::Escape($Pattern)) {
-            throw "Embedded build-host path marker found in $(Split-Path $Executable -Leaf): $Pattern"
+            throw "Unexpected PE import in ${ExecutableName}: $Import"
         }
     }
 }
