@@ -4,9 +4,7 @@ use std::path::{Component, Path, PathBuf, Prefix};
 
 use anyhow::{Context, Result};
 use windows::Win32::Storage::FileSystem::GetDriveTypeW;
-use windows::Win32::System::WindowsProgramming::{
-    DRIVE_NO_ROOT_DIR, DRIVE_REMOTE, DRIVE_UNKNOWN,
-};
+use windows::Win32::System::WindowsProgramming::{DRIVE_NO_ROOT_DIR, DRIVE_REMOTE, DRIVE_UNKNOWN};
 use windows::core::PCWSTR;
 
 pub fn validate_local_media_path(path: &Path) -> Result<PathBuf> {
