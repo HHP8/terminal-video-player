@@ -103,8 +103,7 @@ impl FfmpegPaths {
         let manifest: FfmpegArtifactManifest = serde_json::from_str(FFMPEG_ARTIFACT_MANIFEST)
             .context("parsing embedded FFmpeg artifact manifest")?;
         let expected_version = format!("ffmpeg version {}", manifest.ffmpeg.version);
-        if !ffmpeg_text.contains(&expected_version) || !ffprobe_text.contains(&expected_version)
-        {
+        if !ffmpeg_text.contains(&expected_version) || !ffprobe_text.contains(&expected_version) {
             anyhow::bail!(
                 "FFmpeg version mismatch; expected {}. Install the supported build or pass the matching --ffmpeg-dir",
                 manifest.ffmpeg.version
@@ -114,11 +113,7 @@ impl FfmpegPaths {
         build_text.push_str(&String::from_utf8_lossy(&build.stderr));
         let mut rejected = manifest.ffmpeg.rejected_flags;
         rejected.extend(manifest.ffmpeg.rejected_configuration_terms);
-        validate_build_configuration(
-            &build_text,
-            &manifest.build.configuration_flags,
-            &rejected,
-        )
+        validate_build_configuration(&build_text, &manifest.build.configuration_flags, &rejected)
     }
 }
 

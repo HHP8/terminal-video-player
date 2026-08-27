@@ -7,8 +7,8 @@ use clap::Parser;
 use terminal_video_player::cli::{Cli, Command};
 use terminal_video_player::diagnostics;
 use terminal_video_player::media::FfmpegPaths;
-use terminal_video_player::playback;
 use terminal_video_player::platform::windows::validate_local_media_path;
+use terminal_video_player::playback;
 use terminal_video_player::render::{ColorCapability, DisplayMode, benchmark};
 use terminal_video_player::terminal::{
     DisplayModePolicy, MenuOutcome, TerminalSession, force_restore_terminal, install_panic_hook,

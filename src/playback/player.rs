@@ -78,11 +78,13 @@ pub fn validate_media(input: &Path, cli: &Cli, display_mode: DisplayMode) -> Res
     let media = prepare(input, cli)?;
     let frame = match media {
         PreparedMedia::Image(ImageSource::Still(frame)) => frame,
-        PreparedMedia::Image(ImageSource::Gif(frames)) => frames
-            .into_iter()
-            .next()
-            .context("GIF contains no decoded frames")?
-            .frame,
+        PreparedMedia::Image(ImageSource::Gif(frames)) => {
+            frames
+                .into_iter()
+                .next()
+                .context("GIF contains no decoded frames")?
+                .frame
+        }
         PreparedMedia::Video { input, paths, info } => {
             validate_video_decode(&input, &paths, &info, cli)?
         }
@@ -822,8 +824,8 @@ mod tests {
 
     #[test]
     fn noninteractive_validation_renders_every_display_mode() {
-        let cli = Cli::try_parse_from(["terminal-video-player", "fixture.png"])
-            .expect("validation CLI");
+        let cli =
+            Cli::try_parse_from(["terminal-video-player", "fixture.png"]).expect("validation CLI");
         let frame = RgbFrame {
             generation: 0,
             index: 0,

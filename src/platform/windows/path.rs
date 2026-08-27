@@ -18,9 +18,12 @@ pub fn validate_local_media_path(path: &Path) -> Result<PathBuf> {
     };
     ensure_local_drive(&absolute)?;
 
-    let canonical = absolute
-        .canonicalize()
-        .with_context(|| format!("input does not exist or cannot be resolved: {}", path.display()))?;
+    let canonical = absolute.canonicalize().with_context(|| {
+        format!(
+            "input does not exist or cannot be resolved: {}",
+            path.display()
+        )
+    })?;
     ensure_local_drive(&canonical)?;
     Ok(canonical)
 }
@@ -36,17 +39,26 @@ fn ensure_local_drive(path: &Path) -> Result<()> {
                 anyhow::bail!("device media paths are not permitted: {}", path.display())
             }
         },
-        _ => anyhow::bail!("media path must resolve to a local Windows drive: {}", path.display()),
+        _ => anyhow::bail!(
+            "media path must resolve to a local Windows drive: {}",
+            path.display()
+        ),
     };
 
     let root = format!("{}:\\", char::from(drive));
     let wide: Vec<u16> = OsStr::new(&root).encode_wide().chain(Some(0)).collect();
     let drive_type = unsafe { GetDriveTypeW(PCWSTR(wide.as_ptr())) };
     if drive_type == DRIVE_REMOTE {
-        anyhow::bail!("network-mapped media drives are not permitted: {}", path.display());
+        anyhow::bail!(
+            "network-mapped media drives are not permitted: {}",
+            path.display()
+        );
     }
     if drive_type == DRIVE_UNKNOWN || drive_type == DRIVE_NO_ROOT_DIR {
-        anyhow::bail!("media drive is unavailable or unidentified: {}", path.display());
+        anyhow::bail!(
+            "media drive is unavailable or unidentified: {}",
+            path.display()
+        );
     }
     Ok(())
 }
@@ -69,6 +81,9 @@ mod tests {
         std::fs::write(&path, b"fixture").expect("write fixture");
 
         let validated = validate_local_media_path(&path).expect("validate local path");
-        assert_eq!(validated, path.canonicalize().expect("canonical fixture path"));
+        assert_eq!(
+            validated,
+            path.canonicalize().expect("canonical fixture path")
+        );
     }
 }
