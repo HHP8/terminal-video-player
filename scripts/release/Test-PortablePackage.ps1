@@ -127,3 +127,4 @@ if (-not $SkipRuntime) {
 }
 
 Write-Host 'Extracted portable package validation passed.'
+$global:LASTEXITCODE = 0

@@ -82,6 +82,9 @@ foreach ($RuntimeContract in @(
         throw "Extracted-package validation is missing runtime contract: $RuntimeContract"
     }
 }
+if (-not $PortableValidator.Contains('$global:LASTEXITCODE = 0', [StringComparison]::Ordinal)) {
+    throw 'Extracted-package validation must clear expected native-command failures before returning success.'
+}
 if ($Workflow -match '(?s)Run packaged FFmpeg integration tests.*cargo test') {
     throw 'Runtime validation must exercise the extracted packaged player rather than a checkout-built test binary.'
 }
