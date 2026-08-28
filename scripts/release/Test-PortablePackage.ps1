@@ -88,10 +88,11 @@ if (-not $SkipRuntime) {
     try {
         $env:PATH = "$env:SystemRoot\System32"
         $Diagnostics = (& $Player diagnostics 2>&1 | Out-String)
+        $DiagnosticsExitCode = $LASTEXITCODE
     } finally {
         $env:PATH = $OriginalPath
     }
-    if ($LASTEXITCODE -ne 0) { throw 'Packaged player diagnostics failed.' }
+    if ($DiagnosticsExitCode -ne 0) { throw 'Packaged player diagnostics failed.' }
     if (-not $Diagnostics.Contains("FFmpeg directory: $FfmpegDirectory", [StringComparison]::OrdinalIgnoreCase)) {
         throw 'Packaged player did not resolve FFmpeg from its portable directory.'
     }

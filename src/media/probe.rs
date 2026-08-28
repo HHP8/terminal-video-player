@@ -102,19 +102,24 @@ impl FfmpegPaths {
         let ffprobe_text = String::from_utf8_lossy(&ffprobe_version.stdout);
         let manifest: FfmpegArtifactManifest = serde_json::from_str(FFMPEG_ARTIFACT_MANIFEST)
             .context("parsing embedded FFmpeg artifact manifest")?;
-        let expected_version = format!("ffmpeg version {}", manifest.ffmpeg.version);
-        if !ffmpeg_text.contains(&expected_version) || !ffprobe_text.contains(&expected_version) {
-            anyhow::bail!(
-                "FFmpeg version mismatch; expected {}. Install the supported build or pass the matching --ffmpeg-dir",
-                manifest.ffmpeg.version
-            );
-        }
+        validate_tool_versions(&ffmpeg_text, &ffprobe_text, &manifest.ffmpeg.version)?;
         let mut build_text = String::from_utf8_lossy(&build.stdout).into_owned();
         build_text.push_str(&String::from_utf8_lossy(&build.stderr));
         let mut rejected = manifest.ffmpeg.rejected_flags;
         rejected.extend(manifest.ffmpeg.rejected_configuration_terms);
         validate_build_configuration(&build_text, &manifest.build.configuration_flags, &rejected)
     }
+}
+
+fn validate_tool_versions(ffmpeg: &str, ffprobe: &str, version: &str) -> Result<()> {
+    let expected_ffmpeg = format!("ffmpeg version {version}");
+    let expected_ffprobe = format!("ffprobe version {version}");
+    if !ffmpeg.contains(&expected_ffmpeg) || !ffprobe.contains(&expected_ffprobe) {
+        anyhow::bail!(
+            "FFmpeg version mismatch; expected {version}. Install the supported build or pass the matching --ffmpeg-dir"
+        );
+    }
+    Ok(())
 }
 
 fn tool_output(executable: &Path, argument: &str) -> Result<std::process::Output> {
@@ -356,6 +361,24 @@ mod tests {
                 &incomplete_configuration,
                 &manifest.build.configuration_flags,
                 &rejected,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn validates_distinct_ffmpeg_and_ffprobe_version_prefixes() {
+        validate_tool_versions(
+            "ffmpeg version 9.0.1-terminal-video-player",
+            "ffprobe version 9.0.1-terminal-video-player",
+            "9.0.1",
+        )
+        .expect("matching tool versions");
+        assert!(
+            validate_tool_versions(
+                "ffmpeg version 9.0.1-terminal-video-player",
+                "ffmpeg version 9.0.1-terminal-video-player",
+                "9.0.1",
             )
             .is_err()
         );
