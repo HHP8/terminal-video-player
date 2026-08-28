@@ -219,6 +219,12 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $PrivateRoots = @($env:USERPROFILE, $env:CARGO_HOME, $env:RUSTUP_HOME, $env:RUNNER_TEMP) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique
+          foreach ($Root in $PrivateRoots) {
+            if ($Root -match '\s') { throw "Cannot safely remap build-host path containing whitespace: $Root" }
+            $env:RUSTFLAGS += " --remap-path-prefix=$Root=."
+          }
           cargo build --release --locked
           $Output = '${{ runner.temp }}/player-output'
           $Evidence = Join-Path $Output 'evidence'

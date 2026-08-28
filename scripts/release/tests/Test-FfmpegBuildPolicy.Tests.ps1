@@ -66,6 +66,10 @@ foreach ($RequiredTerm in @(
         throw "FFmpeg auditor is missing required policy term: $RequiredTerm"
     }
 }
+if (-not $Auditor.Contains("'GNU Lesser General Public\s+License'", [StringComparison]::Ordinal) -or
+    $Auditor.Contains(".Contains('GNU Lesser General Public License'", [StringComparison]::Ordinal)) {
+    throw 'FFmpeg auditor must accept the verified multiline LGPL identification output.'
+}
 
 $FixtureGenerator = Get-Content -LiteralPath (Join-Path $RepoRoot 'scripts\Generate-TestMedia.ps1') -Raw
 if ($FixtureGenerator.Contains('libopenh264', [StringComparison]::OrdinalIgnoreCase)) {

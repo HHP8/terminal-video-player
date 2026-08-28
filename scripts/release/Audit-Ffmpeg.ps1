@@ -75,7 +75,7 @@ foreach ($Required in @($Metadata.build.configuration_flags)) {
         throw "FFmpeg build configuration is missing required flag: $Required"
     }
 }
-if (-not $License.Contains('GNU Lesser General Public License', [StringComparison]::Ordinal)) {
+if ($License -notmatch 'GNU Lesser General Public\s+License') {
     throw 'FFmpeg license output does not identify the GNU Lesser General Public License.'
 }
 

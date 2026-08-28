@@ -35,8 +35,9 @@ PNG, JPEG, and GIF are decoded directly by the player. Still images and GIF
 frames are limited to 4096x4096 pixels, with additional allocation, decoded-
 byte, and frame-count limits where applicable. The portable FFmpeg
 build supports local and pipe input for AVI, FLAC, Matroska/WebM, MOV/MP4, MP3,
-MPEG-TS, Ogg, and WAV containers, with its allowlisted AAC, AV1, FLAC, H.264,
-HEVC, MP3, MPEG-4 Part 2, Opus, PCM S16LE, Vorbis, VP8, and VP9 decoders.
+MPEG-TS, Ogg, and WAV containers, with its allowlisted AAC, AV1, FLAC, H.263,
+H.264, HEVC, MP3, MPEG-4 Part 2, Opus, PCM S16LE, Vorbis, VP8, and VP9 decoders.
+H.263 is present because FFmpeg selects it internally for MPEG-4 Part 2 support.
 Actual playback also depends on a file containing a supported combination.
 
 The minimal build excludes network access, TLS, external codec libraries,

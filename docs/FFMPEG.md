@@ -33,9 +33,17 @@ configuration terms.
 
 The minimal build accepts only local file and pipe protocols. Its supported
 demuxers are AVI, FLAC, Matroska/WebM, MOV/MP4, MP3, MPEG-TS, Ogg, and WAV. Its
-allowlisted decoders are AAC, AV1, FLAC, H.264, HEVC, MP3, MPEG-4 Part 2, Opus,
-PCM S16LE, Vorbis, VP8, and VP9. The native MPEG-4 and AAC encoders, MOV muxer,
-and required lavfi sources and filters exist only to generate test media.
+allowlisted decoders are AAC, AV1, FLAC, H.263, H.264, HEVC, MP3, MPEG-4 Part 2,
+Opus, PCM S16LE, Vorbis, VP8, and VP9. H.263 decoding and encoding are required
+internal selections of FFmpeg's MPEG-4 Part 2 implementation. The native
+MPEG-4 and AAC encoders, MOV muxer, and required lavfi sources and filters exist
+only to generate test media. The AC-3 parser is an internal selection of the
+MOV muxer and does not enable AC-3 decoding. The configured `pcm_s16le` muxer
+is exposed by FFmpeg at runtime under the short format name `s16le`, which the
+player uses for its raw PCM audio pipe. FFmpeg's `ffmpeg` command-line program
+also selects its built-in `anull`, `atrim`, `crop`, `hflip`, `null`, `rotate`,
+`transpose`, `trim`, and `vflip` filters; they are recorded explicitly even
+though the player does not request them directly.
 
 Playback still passes `-protocol_whitelist file,pipe` before every FFmpeg input,
 so local playlists and manifests cannot resolve nested HTTP or other network

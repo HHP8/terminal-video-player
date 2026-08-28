@@ -88,6 +88,11 @@ if ($Workflow -match '(?s)Run packaged FFmpeg integration tests.*cargo test') {
 if (-not $Workflow.Contains('target-feature=+crt-static', [StringComparison]::Ordinal)) {
     throw 'Portable player builds must statically link the MSVC runtime.'
 }
+foreach ($RemapRoot in @('$env:USERPROFILE', '$env:CARGO_HOME', '$env:RUSTUP_HOME', '$env:RUNNER_TEMP')) {
+    if (-not $Workflow.Contains($RemapRoot, [StringComparison]::Ordinal)) {
+        throw "Portable player builds do not remap private build-host root: $RemapRoot"
+    }
+}
 
 $Components = Get-Content -LiteralPath (Join-Path $RepoRoot 'third-party\ffmpeg-components.json') -Raw | ConvertFrom-Json
 if (@($Components.allowed_player_pe_imports | Where-Object { $_ -match '(?i)^VCRUNTIME.*\.dll$' }).Count -ne 0) {
