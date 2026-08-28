@@ -101,10 +101,7 @@ if (-not $SkipRuntime) {
     New-Item -ItemType Directory -Path $FixtureDirectory -Force | Out-Null
     $Still = Join-Path $FixtureDirectory 'validation-still.png'
     $Gif = Join-Path $FixtureDirectory 'validation-animation.gif'
-    [IO.File]::WriteAllBytes($Still, [Convert]::FromBase64String(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nXsAAAAASUVORK5CYII='))
-    [IO.File]::WriteAllBytes($Gif, [Convert]::FromBase64String(
-        'R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='))
+    & (Join-Path $RepositoryRoot 'scripts\release\New-PortableValidationImages.ps1') -OutputDirectory $FixtureDirectory
     & (Join-Path $RepositoryRoot 'scripts\Generate-TestMedia.ps1') -DurationSeconds 10 -Resolution '320x180' -FfmpegDirectory $FfmpegDirectory -OutputDirectory $FixtureDirectory
     if ($LASTEXITCODE -ne 0) { throw 'Packaged FFmpeg fixture generation failed.' }
     $Fixture = Join-Path $FixtureDirectory 'flash-click-320x180-10s.mp4'

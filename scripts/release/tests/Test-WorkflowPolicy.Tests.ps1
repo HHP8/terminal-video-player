@@ -113,4 +113,33 @@ if (@($Components.allowed_player_pe_imports | Where-Object { $_ -match '(?i)^VCR
     throw 'Portable player import policy must not allow a redistributable VC runtime DLL.'
 }
 
+$ImageFixtureGenerator = Join-Path $RepoRoot 'scripts\release\New-PortableValidationImages.ps1'
+if (-not (Test-Path -LiteralPath $ImageFixtureGenerator -PathType Leaf)) {
+    throw 'Portable image fixture generator is missing.'
+}
+$FixtureRoot = Join-Path $RepoRoot 'target\release-policy-tests\portable-image-fixtures'
+if (Test-Path -LiteralPath $FixtureRoot) {
+    Remove-Item -LiteralPath $FixtureRoot -Recurse -Force
+}
+New-Item -ItemType Directory -Path $FixtureRoot -Force | Out-Null
+try {
+    & $ImageFixtureGenerator -OutputDirectory $FixtureRoot
+    Add-Type -AssemblyName System.Drawing
+    foreach ($FixtureName in @('validation-still.png', 'validation-animation.gif')) {
+        $FixturePath = Join-Path $FixtureRoot $FixtureName
+        $Image = [System.Drawing.Image]::FromFile($FixturePath)
+        try {
+            if ($Image.Width -ne 1 -or $Image.Height -ne 1) {
+                throw "Portable image fixture has unexpected dimensions: $FixtureName"
+            }
+        }
+        finally {
+            $Image.Dispose()
+        }
+    }
+}
+finally {
+    Remove-Item -LiteralPath $FixtureRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host 'Portable workflow policy validation passed.'
