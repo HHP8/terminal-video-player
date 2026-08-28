@@ -45,8 +45,9 @@ demuxers are AVI, FLAC, Matroska/WebM, MOV/MP4, MP3, MPEG-TS, Ogg, and WAV. Its
 allowlisted decoders are AAC, AV1, FLAC, H.263, H.264, HEVC, MP3, MPEG-4 Part 2,
 Opus, PCM S16LE, Vorbis, VP8, and VP9. H.263 decoding and encoding are required
 internal selections of FFmpeg's MPEG-4 Part 2 implementation. The native
-MPEG-4 and AAC encoders, MP4/MOV muxers, and required lavfi sources and filters
-exist only to generate test media. FFmpeg's `mp4` muxer selects its `mov` muxer
+MPEG-4 and AAC encoders, MP4/MOV muxers, `wrapped_avframe` decoder, and required
+lavfi sources and filters exist only to generate test media. FFmpeg's `mp4`
+muxer selects its `mov` muxer
 implementation. The AC-3 parser is an internal selection of that MOV
 implementation and does not enable AC-3 decoding. The configured `pcm_s16le`
 muxer is exposed by FFmpeg at runtime under the short format name `s16le`, which

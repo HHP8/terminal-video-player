@@ -38,6 +38,8 @@ build supports local and pipe input for AVI, FLAC, Matroska/WebM, MOV/MP4, MP3,
 MPEG-TS, Ogg, and WAV containers, with its allowlisted AAC, AV1, FLAC, H.263,
 H.264, HEVC, MP3, MPEG-4 Part 2, Opus, PCM S16LE, Vorbis, VP8, and VP9 decoders.
 H.263 is present because FFmpeg selects it internally for MPEG-4 Part 2 support.
+The fixture-only `wrapped_avframe` decoder consumes frames produced by the
+allowlisted lavfi sources during package validation.
 Actual playback also depends on a file containing a supported combination.
 
 The minimal build excludes network access, TLS, external codec libraries,
