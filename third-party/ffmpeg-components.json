@@ -10,7 +10,6 @@
   "filters": ["aevalsrc", "aformat", "anull", "aresample", "atrim", "color", "crop", "drawbox", "format", "fps", "hflip", "null", "rotate", "scale", "setpts", "transpose", "trim", "vflip"],
   "indevs": ["lavfi"],
   "allowed_pe_imports": [
-    "ADVAPI32.dll",
     "api-ms-win-crt-conio-l1-1-0.dll",
     "api-ms-win-crt-convert-l1-1-0.dll",
     "api-ms-win-crt-environment-l1-1-0.dll",
@@ -18,6 +17,7 @@
     "api-ms-win-crt-heap-l1-1-0.dll",
     "api-ms-win-crt-locale-l1-1-0.dll",
     "api-ms-win-crt-math-l1-1-0.dll",
+    "api-ms-win-crt-private-l1-1-0.dll",
     "api-ms-win-crt-runtime-l1-1-0.dll",
     "api-ms-win-crt-stdio-l1-1-0.dll",
     "api-ms-win-crt-string-l1-1-0.dll",
@@ -25,9 +25,7 @@
     "api-ms-win-crt-utility-l1-1-0.dll",
     "bcrypt.dll",
     "KERNEL32.dll",
-    "ole32.dll",
-    "SHELL32.dll",
-    "USER32.dll"
+    "SHELL32.dll"
   ],
   "allowed_player_pe_imports": [
     "ADVAPI32.dll",
