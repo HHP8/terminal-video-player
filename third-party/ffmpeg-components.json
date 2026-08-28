@@ -6,7 +6,7 @@
   "decoders": ["aac", "av1", "flac", "h263", "h264", "hevc", "mp3", "mp3float", "mpeg4", "opus", "pcm_s16le", "vorbis", "vp8", "vp9"],
   "parsers": ["aac", "ac3", "av1", "flac", "h264", "hevc", "mpeg4video", "mpegaudio", "opus", "vorbis", "vp8", "vp9"],
   "encoders": ["aac", "h263", "mpeg4", "pcm_s16le", "rawvideo"],
-  "muxers": ["mov", "pcm_s16le", "rawvideo"],
+  "muxers": ["mov", "mp4", "pcm_s16le", "rawvideo"],
   "filters": ["aevalsrc", "aformat", "anull", "aresample", "atrim", "color", "crop", "drawbox", "format", "fps", "hflip", "null", "rotate", "scale", "setpts", "transpose", "trim", "vflip"],
   "indevs": ["lavfi"],
   "allowed_pe_imports": [
