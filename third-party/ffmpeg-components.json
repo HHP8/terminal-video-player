@@ -3,7 +3,7 @@
   "libraries": ["avcodec", "avdevice", "avfilter", "avformat", "avutil", "swresample", "swscale"],
   "protocols": ["file", "pipe"],
   "demuxers": ["avi", "flac", "matroska", "mov", "mp3", "mpegts", "ogg", "wav"],
-  "decoders": ["aac", "av1", "flac", "h263", "h264", "hevc", "mp3", "mp3float", "mpeg4", "opus", "pcm_s16le", "vorbis", "vp8", "vp9", "wrapped_avframe"],
+  "decoders": ["aac", "av1", "flac", "h263", "h264", "hevc", "mp3", "mp3float", "mpeg4", "opus", "pcm_f64le", "pcm_s16le", "vorbis", "vp8", "vp9", "wrapped_avframe"],
   "parsers": ["aac", "ac3", "av1", "flac", "h264", "hevc", "mpeg4video", "mpegaudio", "opus", "vorbis", "vp8", "vp9"],
   "encoders": ["aac", "h263", "mpeg4", "pcm_s16le", "rawvideo"],
   "muxers": ["mov", "mp4", "pcm_s16le", "rawvideo"],

@@ -162,8 +162,10 @@ foreach ($Property in @(
 if (($Components.protocols -join ',') -cne 'file,pipe') {
     throw 'Portable FFmpeg protocols must be exactly file and pipe.'
 }
-if ('wrapped_avframe' -notin @($Components.decoders)) {
-    throw 'Portable FFmpeg decoders must include wrapped_avframe for lavfi fixture generation.'
+foreach ($FixtureDecoder in @('pcm_f64le', 'wrapped_avframe')) {
+    if ($FixtureDecoder -notin @($Components.decoders)) {
+        throw "Portable FFmpeg decoders must include $FixtureDecoder for lavfi fixture generation."
+    }
 }
 
 if ($Actions.schema -ne 1) { throw 'Release-actions schema must equal 1.' }

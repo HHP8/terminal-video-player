@@ -17,36 +17,39 @@ if (-not (Test-Path -LiteralPath $ValidatorPath -PathType Leaf)) {
     -ComponentsPath $ComponentsPath `
     -ActionsPath $ActionsPath
 
-$MutationRoot = Join-Path $RepoRoot 'target\release-policy-tests\missing-wrapped-avframe'
-if (Test-Path -LiteralPath $MutationRoot) {
-    Remove-Item -LiteralPath $MutationRoot -Recurse -Force
-}
-New-Item -ItemType Directory -Path $MutationRoot -Force | Out-Null
-try {
-    $MutatedComponentsPath = Join-Path $MutationRoot 'ffmpeg-components.json'
-    $MutatedComponents = Get-Content -LiteralPath $ComponentsPath -Raw | ConvertFrom-Json
-    $MutatedComponents.decoders = @($MutatedComponents.decoders | Where-Object { $_ -cne 'wrapped_avframe' })
-    $MutatedComponents | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $MutatedComponentsPath -Encoding utf8NoBOM
-
-    $ValidationFailure = $null
+$MutationBase = Join-Path $RepoRoot 'target\release-policy-tests'
+foreach ($RequiredFixtureDecoder in @('pcm_f64le', 'wrapped_avframe')) {
+    $MutationRoot = Join-Path $MutationBase "missing-$RequiredFixtureDecoder"
+    if (Test-Path -LiteralPath $MutationRoot) {
+        Remove-Item -LiteralPath $MutationRoot -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $MutationRoot -Force | Out-Null
     try {
-        & $ValidatorPath `
-            -MetadataPath $MetadataPath `
-            -ComponentsPath $MutatedComponentsPath `
-            -ActionsPath $ActionsPath
+        $MutatedComponentsPath = Join-Path $MutationRoot 'ffmpeg-components.json'
+        $MutatedComponents = Get-Content -LiteralPath $ComponentsPath -Raw | ConvertFrom-Json
+        $MutatedComponents.decoders = @($MutatedComponents.decoders | Where-Object { $_ -cne $RequiredFixtureDecoder })
+        $MutatedComponents | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $MutatedComponentsPath -Encoding utf8NoBOM
+
+        $ValidationFailure = $null
+        try {
+            & $ValidatorPath `
+                -MetadataPath $MetadataPath `
+                -ComponentsPath $MutatedComponentsPath `
+                -ActionsPath $ActionsPath
+        }
+        catch {
+            $ValidationFailure = $_.Exception.Message
+        }
+        if ($null -eq $ValidationFailure) {
+            throw "Release metadata validation accepted a component allowlist missing fixture decoder $RequiredFixtureDecoder."
+        }
+        if (-not $ValidationFailure.Contains($RequiredFixtureDecoder, [StringComparison]::Ordinal)) {
+            throw "The missing lavfi fixture decoder produced an unexpected validation error: $ValidationFailure"
+        }
     }
-    catch {
-        $ValidationFailure = $_.Exception.Message
+    finally {
+        Remove-Item -LiteralPath $MutationRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
-    if ($null -eq $ValidationFailure) {
-        throw 'Release metadata validation accepted a component allowlist that cannot consume lavfi video fixtures.'
-    }
-    if (-not $ValidationFailure.Contains('wrapped_avframe', [StringComparison]::Ordinal)) {
-        throw "The missing lavfi fixture decoder produced an unexpected validation error: $ValidationFailure"
-    }
-}
-finally {
-    Remove-Item -LiteralPath $MutationRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 $Metadata = Get-Content -LiteralPath $MetadataPath -Raw | ConvertFrom-Json
