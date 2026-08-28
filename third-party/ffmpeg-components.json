@@ -11,6 +11,7 @@
   "indevs": ["lavfi"],
   "allowed_pe_imports": [
     "ADVAPI32.dll",
+    "api-ms-win-crt-conio-l1-1-0.dll",
     "api-ms-win-crt-convert-l1-1-0.dll",
     "api-ms-win-crt-environment-l1-1-0.dll",
     "api-ms-win-crt-filesystem-l1-1-0.dll",

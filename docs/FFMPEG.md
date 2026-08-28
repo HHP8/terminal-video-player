@@ -21,6 +21,9 @@ The cross-toolchain is the version-specific llvm-mingw 20260616 UCRT artifact
 with LLVM 22.1.8. Its archive identity, source recipe commit, incorporated
 component source revisions, licenses, and SHA-256 are recorded in
 [`../third-party/ffmpeg-artifact.json`](../third-party/ffmpeg-artifact.json).
+The resulting executables import only allowlisted Windows system DLLs and UCRT
+API-set forwarders. This includes the console API-set
+`api-ms-win-crt-conio-l1-1-0.dll`; no redistributable runtime DLL is bundled.
 
 Configuration starts with `--disable-everything`. It disables autodetection,
 network access, shared libraries, documentation, debug information, and x86

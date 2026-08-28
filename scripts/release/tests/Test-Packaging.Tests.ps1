@@ -44,6 +44,12 @@ $SyntheticDevRegistry = Join-Path $TestRoot 'cargo-registry\dev-only-9.9.9'
 New-Item -ItemType Directory -Path $SyntheticDevRegistry -Force | Out-Null
 Set-Content -LiteralPath (Join-Path $SyntheticDevRegistry 'Cargo.toml') -Value '[package]' -Encoding ascii
 Set-Content -LiteralPath (Join-Path $SyntheticDevRegistry 'LICENSE') -Value 'Dev-only terms' -Encoding ascii
+$SyntheticFallbackRegistry = Join-Path $TestRoot 'cargo-registry\dasp_sample-0.11.0'
+New-Item -ItemType Directory -Path $SyntheticFallbackRegistry -Force | Out-Null
+Set-Content -LiteralPath (Join-Path $SyntheticFallbackRegistry 'Cargo.toml') -Value '[package]' -Encoding ascii
+@{ git = @{ sha1 = '97c3bb9b2363c0b46ac1633858bf1054fd02a980' } } |
+    ConvertTo-Json -Depth 3 |
+    Set-Content -LiteralPath (Join-Path $SyntheticFallbackRegistry '.cargo_vcs_info.json') -Encoding utf8NoBOM
 $SyntheticCargoMetadata = Join-Path $TestRoot 'cargo-metadata.json'
 @{
     packages = @(
@@ -58,18 +64,26 @@ $SyntheticCargoMetadata = Join-Path $TestRoot 'cargo-metadata.json'
         @{
             name = 'dev-only'; version = '9.9.9'; source = 'registry+https://github.com/rust-lang/crates.io-index'
             manifest_path = (Join-Path $SyntheticDevRegistry 'Cargo.toml'); license = 'MIT'; license_file = $null
+        },
+        @{
+            name = 'dasp_sample'; version = '0.11.0'; source = 'registry+https://github.com/rust-lang/crates.io-index'
+            manifest_path = (Join-Path $SyntheticFallbackRegistry 'Cargo.toml'); license = 'MIT OR Apache-2.0'; license_file = $null
         }
     )
 } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $SyntheticCargoMetadata -Encoding utf8NoBOM
 $SyntheticReleaseGraph = Join-Path $TestRoot 'release-packages.txt'
-@('terminal-video-player v0.1.1', 'example v1.2.3') |
+@('terminal-video-player v0.1.1', 'example v1.2.3', 'dasp_sample v0.11.0') |
     Set-Content -LiteralPath $SyntheticReleaseGraph -Encoding utf8NoBOM
 & (Join-Path $RepoRoot 'scripts\release\New-RustLicenseBundle.ps1') `
     -MetadataPath $SyntheticCargoMetadata -ReleasePackageListPath $SyntheticReleaseGraph `
     -OutputDirectory $SyntheticRustLicenses
 $RustLicenseFiles = @((Get-TreeManifest -Root $SyntheticRustLicenses).path)
 foreach ($ExpectedLicense in @(
-    'RUST-DEPENDENCIES.json', 'example-1.2.3/LICENSE-MIT', 'example-1.2.3/NOTICE'
+    'RUST-DEPENDENCIES.json',
+    'dasp_sample-0.11.0/LICENSE-APACHE',
+    'dasp_sample-0.11.0/LICENSE-MIT',
+    'example-1.2.3/LICENSE-MIT',
+    'example-1.2.3/NOTICE'
 )) {
     if ($ExpectedLicense -notin $RustLicenseFiles) {
         throw "Rust dependency license bundle is missing: $ExpectedLicense"
@@ -77,6 +91,13 @@ foreach ($ExpectedLicense in @(
 }
 if ($RustLicenseFiles -contains 'dev-only-9.9.9/LICENSE') {
     throw 'Rust license bundle included a dev-only package outside the Windows release graph.'
+}
+$RustLicenseInventory = Get-Content -LiteralPath (Join-Path $SyntheticRustLicenses 'RUST-DEPENDENCIES.json') -Raw | ConvertFrom-Json
+$FallbackInventory = @($RustLicenseInventory.packages | Where-Object { $_.name -ceq 'dasp_sample' })
+if ($FallbackInventory.Count -ne 1 -or
+    $FallbackInventory[0].licenseMaterialSource -cne 'pinned-upstream-fallback' -or
+    $FallbackInventory[0].vcsRevision -cne '97c3bb9b2363c0b46ac1633858bf1054fd02a980') {
+    throw 'Rust license bundle did not record the pinned dasp_sample fallback provenance.'
 }
 
 $FirstManifest = @(Get-TreeManifest -Root $InputRoot)
@@ -207,6 +228,7 @@ $SbomProgram = Join-Path $RepoRoot 'scripts\release\New-Sbom.ps1'
 $SyntheticReviewedLicenses = Join-Path $TestRoot 'reviewed-rust-licenses.csv'
 @(
     'name,version,detected_license,source',
+    '"dasp_sample","0.11.0","MIT OR Apache-2.0","registry+https://github.com/rust-lang/crates.io-index"',
     '"example","1.2.3","MIT","registry+https://github.com/rust-lang/crates.io-index"'
 ) | Set-Content -LiteralPath $SyntheticReviewedLicenses -Encoding utf8NoBOM
 $ReleaseMetadata = Get-Content -LiteralPath (Join-Path $RepoRoot 'third-party\ffmpeg-artifact.json') -Raw | ConvertFrom-Json

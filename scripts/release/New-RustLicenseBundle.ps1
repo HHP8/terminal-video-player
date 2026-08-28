@@ -7,6 +7,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'ReleaseTools.psm1') -Force
+$RepoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$FallbackMetadataPath = Join-Path $RepoRoot 'third-party\rust-license-fallbacks.json'
+$FallbackMetadata = Get-Content -LiteralPath $FallbackMetadataPath -Raw | ConvertFrom-Json
+if ($FallbackMetadata.schema -ne 1) { throw 'Unsupported Rust license fallback metadata schema.' }
 $Metadata = Get-Content -LiteralPath $MetadataPath -Raw | ConvertFrom-Json
 $ReleasePackageListPath = [IO.Path]::GetFullPath($ReleasePackageListPath)
 if (-not (Test-Path -LiteralPath $ReleasePackageListPath -PathType Leaf)) {
@@ -44,6 +48,8 @@ $Inventory = foreach ($Package in @($MetadataPackages | Where-Object {
     Assert-SafeRelativePath $PackageId
     $DestinationRoot = Join-Path $OutputDirectory $PackageId
     New-Item -ItemType Directory -Path $DestinationRoot | Out-Null
+    $LicenseMaterialSource = 'crate-package'
+    $VcsRevision = $null
 
     $Candidates = [Collections.Generic.List[IO.FileInfo]]::new()
     if ($null -ne $Package.license_file -and -not [string]::IsNullOrWhiteSpace([string]$Package.license_file)) {
@@ -58,7 +64,40 @@ $Inventory = foreach ($Package in @($MetadataPackages | Where-Object {
     }
     $Candidates = @($Candidates | Sort-Object FullName -Unique)
     if ($Candidates.Count -eq 0) {
-        throw "Dependency has no discoverable license or notice file: $PackageId"
+        $Fallbacks = @($FallbackMetadata.packages | Where-Object {
+            $_.name -ceq [string]$Package.name -and
+            $_.version -ceq [string]$Package.version -and
+            $_.source -ceq [string]$Package.source -and
+            $_.license_expression -ceq [string]$Package.license
+        })
+        if ($Fallbacks.Count -ne 1) {
+            throw "Dependency has no discoverable license or uniquely pinned fallback notice: $PackageId"
+        }
+        $Fallback = $Fallbacks[0]
+        $VcsInfoPath = Join-Path $PackageRoot '.cargo_vcs_info.json'
+        if (-not (Test-Path -LiteralPath $VcsInfoPath -PathType Leaf)) {
+            throw "Fallback dependency is missing Cargo VCS provenance: $PackageId"
+        }
+        $VcsInfo = Get-Content -LiteralPath $VcsInfoPath -Raw | ConvertFrom-Json
+        $VcsRevision = [string]$VcsInfo.git.sha1
+        if ($VcsRevision -cne [string]$Fallback.vcs_revision) {
+            throw "Fallback dependency VCS revision mismatch: $PackageId"
+        }
+        foreach ($FallbackFile in @($Fallback.files)) {
+            Assert-SafeRelativePath ([string]$FallbackFile.path)
+            $FallbackPath = Join-Path $RepoRoot ([string]$FallbackFile.path)
+            if (-not (Test-Path -LiteralPath $FallbackPath -PathType Leaf)) {
+                throw "Pinned fallback license file is missing: $($FallbackFile.path)"
+            }
+            $ActualHash = (Get-FileHash -LiteralPath $FallbackPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($ActualHash -cne [string]$FallbackFile.sha256) {
+                throw "Pinned fallback license hash mismatch: $($FallbackFile.path)"
+            }
+            $Candidates += Get-Item -LiteralPath $FallbackPath
+        }
+        $Candidates = @($Candidates | Sort-Object FullName -Unique)
+        if ($Candidates.Count -eq 0) { throw "Pinned fallback license set is empty: $PackageId" }
+        $LicenseMaterialSource = 'pinned-upstream-fallback'
     }
 
     $Files = foreach ($File in $Candidates) {
@@ -82,6 +121,8 @@ $Inventory = foreach ($Package in @($MetadataPackages | Where-Object {
         version = [string]$Package.version
         source = [string]$Package.source
         licenseExpression = [string]$Package.license
+        licenseMaterialSource = $LicenseMaterialSource
+        vcsRevision = $VcsRevision
         files = @($Files)
     }
 }

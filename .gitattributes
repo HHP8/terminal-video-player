@@ -15,6 +15,7 @@ LICENSE text eol=lf
 *.asc text eol=lf
 *.sh text eol=lf
 *.ps1 text eol=crlf
+third-party/rust-license-fallbacks/** text eol=lf
 
 *.dll binary
 *.exe binary

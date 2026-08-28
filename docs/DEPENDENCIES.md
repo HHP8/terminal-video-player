@@ -32,9 +32,15 @@ portable workflow derives the exact Windows release package set with
 matches that set against target-filtered Cargo metadata and the reviewed CSV,
 and excludes development-only and irrelevant target packages from the portable
 license bundle and SBOM. It fails if a selected dependency has no discoverable
-license or notice file, then bundles the detected files plus a hashed
-dependency-license inventory under `licenses/Rust`. Dependency source is not
-vendored into this repository.
+license or notice file. The `dasp_sample` 0.11.0 crate package omits the notices
+present at its recorded
+[upstream VCS revision](https://github.com/RustAudio/dasp/tree/97c3bb9b2363c0b46ac1633858bf1054fd02a980),
+so the repository carries exact hash-pinned copies of those two upstream notice
+files. The workflow accepts them only when the crate name, version, registry
+source, declared license expression, and Cargo VCS revision all match the
+reviewed fallback metadata. It then bundles all detected or pinned files plus a
+hashed dependency-license inventory under `licenses/Rust`. Dependency source
+is not vendored into this repository.
 
 ## Direct dependencies
 
