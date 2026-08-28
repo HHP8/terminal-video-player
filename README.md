@@ -51,6 +51,8 @@ Tagged portable prereleases contain only the player, source-built `ffmpeg.exe`
 and `ffprobe.exe`, required notices, provenance, and package verification
 records. FFmpeg is an independent third-party program; it is not part of
 Terminal Video Player and is not linked into the Rust executable.
+The adjacent reproducibility report records both exact resolved GitHub-hosted
+Windows images and the SHA-256 of every bit-for-bit compared build asset.
 
 Download the ZIP and its `.sha256` file from the same GitHub prerelease. Verify
 before extraction:

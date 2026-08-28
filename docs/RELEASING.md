@@ -28,6 +28,9 @@ They are not installers and must not be assembled or uploaded manually.
    tar, xz, and jq versions captured by both builds. Hosted runner
    labels are not immutable image digests, so a runner-image change requires a
    new manual validation and evidence review even when source hashes are stable.
+   Confirm that the reproducibility report contains the exact resolved metadata
+   for both isolated Windows builds. That volatile metadata must remain outside
+   the portable payload so truthful provenance does not make the archive vary.
 9. Review the generated Rust dependency license bundle. Every package in the
    `x86_64-pc-windows-msvc` normal/build release graph must match the reviewed
    inventory and have detected license or notice files. Development-only and
@@ -52,7 +55,10 @@ and action commit pins before pushing a release commit.
 The manual run must be launched from the exact `main` commit intended for the
 tag. Compare both FFmpeg binaries, both player binaries, both portable ZIPs,
 both corresponding-source bundles, manifests, SBOMs, and provenance records.
-Any unexplained byte difference is a publication blocker.
+The seven independently assembled build assets must be bit-for-bit identical.
+The separately generated reproducibility report must record both resolved
+hosted-runner images and matching player and FFmpeg binary hashes. Any
+unexplained byte difference is a publication blocker.
 
 ## Publishing
 

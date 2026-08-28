@@ -148,7 +148,11 @@
       "-portable-windows-x86_64.zip",
       "-portable-windows-x86_64.zip.sha256",
       "-provenance.json",
+      "-reproducibility.json",
       "-sbom.spdx.json"
+    ],
+    "generated_asset_suffixes": [
+      "-reproducibility.json"
     ]
   }
 }

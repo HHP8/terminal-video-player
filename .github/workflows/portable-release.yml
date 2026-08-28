@@ -250,12 +250,18 @@ jobs:
             -ReleasePackageListPath (Join-Path $Evidence 'RUST-RELEASE-PACKAGES.txt') `
             -OutputDirectory $RustLicenses
           [ordered]@{
+            requested_image = 'windows-2025'
+            runner_arch = "$env:RUNNER_ARCH"
+            runner_os = "$env:RUNNER_OS"
+            resolved_metadata = 'published in the release reproducibility report'
+          } | ConvertTo-Json | Set-Content (Join-Path $Evidence 'WINDOWS-RUNNER.json') -Encoding utf8NoBOM
+          [ordered]@{
             image_os = "$env:ImageOS"
             image_version = "$env:ImageVersion"
             image_release = "$env:ImageRelease"
             runner_arch = "$env:RUNNER_ARCH"
             runner_os = "$env:RUNNER_OS"
-          } | ConvertTo-Json | Set-Content (Join-Path $Evidence 'WINDOWS-RUNNER.json') -Encoding utf8NoBOM
+          } | ConvertTo-Json | Set-Content (Join-Path $Evidence 'WINDOWS-RUNNER-RESOLVED.json') -Encoding utf8NoBOM
       - name: Upload player build
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -320,7 +326,9 @@ jobs:
             -RustDependencyInventoryPath '${{ runner.temp }}/player-output/rust-licenses/RUST-DEPENDENCIES.json' `
             -ToolchainLicenseDirectory '${{ runner.temp }}/ffmpeg-output/licenses/toolchain' `
             -OutputPath (Join-Path $Assets "terminal-video-player-v$Version-sbom.spdx.json")
-          $Expected = @((Get-Content ./third-party/ffmpeg-artifact.json -Raw | ConvertFrom-Json).package.published_asset_suffixes | ForEach-Object { "terminal-video-player-v$Version$_" } | Sort-Object -CaseSensitive)
+          $PackageMetadata = (Get-Content ./third-party/ffmpeg-artifact.json -Raw | ConvertFrom-Json).package
+          $GeneratedSuffixes = @($PackageMetadata.generated_asset_suffixes)
+          $Expected = @($PackageMetadata.published_asset_suffixes | Where-Object { $_ -notin $GeneratedSuffixes } | ForEach-Object { "terminal-video-player-v$Version$_" } | Sort-Object -CaseSensitive)
           $Actual = @((Get-ChildItem -LiteralPath $Assets -File).Name | Sort-Object -CaseSensitive)
           if (($Actual -join "`n") -cne ($Expected -join "`n")) { throw 'Candidate release assets differ from the reviewed allowlist.' }
       - name: Upload candidate release replica
@@ -352,12 +360,25 @@ jobs:
         with:
           name: release-assets-b
           path: ${{ runner.temp }}/replica-b
+      - name: Download player build A provenance
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: player-build-a
+          path: ${{ runner.temp }}/player-a
+      - name: Download player build B provenance
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: player-build-b
+          path: ${{ runner.temp }}/player-b
       - name: Require bit-for-bit reproducibility
         shell: pwsh
         run: |
           ./scripts/release/Compare-ReleaseReplicas.ps1 -MetadataPath ./third-party/ffmpeg-artifact.json `
             -Version '${{ needs.metadata.outputs.version }}' -ReplicaA '${{ runner.temp }}/replica-a' `
-            -ReplicaB '${{ runner.temp }}/replica-b' -OutputDirectory '${{ runner.temp }}/verified-release-assets'
+            -ReplicaB '${{ runner.temp }}/replica-b' `
+            -RunnerMetadataA '${{ runner.temp }}/player-a/evidence/WINDOWS-RUNNER-RESOLVED.json' `
+            -RunnerMetadataB '${{ runner.temp }}/player-b/evidence/WINDOWS-RUNNER-RESOLVED.json' `
+            -OutputDirectory '${{ runner.temp }}/verified-release-assets'
       - name: Upload verified release assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -435,7 +456,8 @@ jobs:
           gh release view $env:RELEASE_TAG --repo '${{ github.repository }}' *> $null
           if ($LASTEXITCODE -eq 0) { throw 'The target GitHub release already exists.' }
           $Assets = @(Get-ChildItem -LiteralPath '${{ runner.temp }}/verified-release-assets' -File | Sort-Object Name)
-          if ($Assets.Count -ne 7) { throw 'Verified publication inventory is incomplete.' }
+          $ExpectedCount = @((Get-Content ./third-party/ffmpeg-artifact.json -Raw | ConvertFrom-Json).package.published_asset_suffixes).Count
+          if ($Assets.Count -ne $ExpectedCount) { throw 'Verified publication inventory is incomplete.' }
           gh release create $env:RELEASE_TAG @($Assets.FullName) --repo '${{ github.repository }}' `
             --verify-tag --prerelease --title "Terminal Video Player $env:RELEASE_TAG" `
             --notes-file "docs/releases/$env:RELEASE_TAG.md"

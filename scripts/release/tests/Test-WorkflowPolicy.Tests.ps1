@@ -93,6 +93,20 @@ foreach ($RemapRoot in @('$env:USERPROFILE', '$env:CARGO_HOME', '$env:RUSTUP_HOM
         throw "Portable player builds do not remap private build-host root: $RemapRoot"
     }
 }
+foreach ($RunnerProvenanceTerm in @(
+    "requested_image = 'windows-2025'",
+    'WINDOWS-RUNNER-RESOLVED.json',
+    'RunnerMetadataA',
+    'RunnerMetadataB',
+    'generated_asset_suffixes'
+)) {
+    if (-not $Workflow.Contains($RunnerProvenanceTerm, [StringComparison]::Ordinal)) {
+        throw "Portable workflow does not separate reproducible payload metadata from exact runner provenance: $RunnerProvenanceTerm"
+    }
+}
+if ($Workflow.Contains('$Assets.Count -ne 7', [StringComparison]::Ordinal)) {
+    throw 'Publication inventory count must be derived from reviewed metadata.'
+}
 
 $Components = Get-Content -LiteralPath (Join-Path $RepoRoot 'third-party\ffmpeg-components.json') -Raw | ConvertFrom-Json
 if (@($Components.allowed_player_pe_imports | Where-Object { $_ -match '(?i)^VCRUNTIME.*\.dll$' }).Count -ne 0) {

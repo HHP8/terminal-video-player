@@ -16,24 +16,50 @@ $A = Join-Path $Root 'a'
 $B = Join-Path $Root 'b'
 $Verified = Join-Path $Root 'verified'
 New-Item -ItemType Directory -Path $A, $B | Out-Null
-foreach ($Suffix in @($Metadata.package.published_asset_suffixes)) {
+$GeneratedSuffixes = @($Metadata.package.generated_asset_suffixes)
+$ReplicaSuffixes = @($Metadata.package.published_asset_suffixes | Where-Object { $_ -notin $GeneratedSuffixes })
+foreach ($Suffix in $ReplicaSuffixes) {
     $Name = "terminal-video-player-v0.1.1$Suffix"
-    Set-Content -LiteralPath (Join-Path $A $Name) -Value "synthetic $Suffix" -Encoding utf8NoBOM
+    if ($Suffix -ceq '-manifest.json') {
+        [ordered]@{
+            schema = 1
+            files = @(
+                [ordered]@{ path = 'terminal-video-player.exe'; size = 1; sha256 = ('1'.PadLeft(64, '1')) },
+                [ordered]@{ path = 'tools/ffmpeg/ffmpeg.exe'; size = 1; sha256 = ('2'.PadLeft(64, '2')) },
+                [ordered]@{ path = 'tools/ffmpeg/ffprobe.exe'; size = 1; sha256 = ('3'.PadLeft(64, '3')) }
+            )
+        } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $A $Name) -Encoding utf8NoBOM
+    } else {
+        Set-Content -LiteralPath (Join-Path $A $Name) -Value "synthetic $Suffix" -Encoding utf8NoBOM
+    }
     Copy-Item -LiteralPath (Join-Path $A $Name) -Destination (Join-Path $B $Name)
 }
+$RunnerA = Join-Path $Root 'runner-a.json'
+$RunnerB = Join-Path $Root 'runner-b.json'
+[ordered]@{ image_os = 'win25-vs2026'; image_version = '1'; image_release = ''; runner_arch = 'X64'; runner_os = 'Windows' } |
+    ConvertTo-Json | Set-Content -LiteralPath $RunnerA -Encoding utf8NoBOM
+[ordered]@{ image_os = 'win25-vs2026'; image_version = '2'; image_release = ''; runner_arch = 'X64'; runner_os = 'Windows' } |
+    ConvertTo-Json | Set-Content -LiteralPath $RunnerB -Encoding utf8NoBOM
 
 & $Program -MetadataPath (Join-Path $RepoRoot 'third-party\ffmpeg-artifact.json') `
-    -Version '0.1.1' -ReplicaA $A -ReplicaB $B -OutputDirectory $Verified
+    -Version '0.1.1' -ReplicaA $A -ReplicaB $B -RunnerMetadataA $RunnerA `
+    -RunnerMetadataB $RunnerB -OutputDirectory $Verified
 if (@(Get-ChildItem -LiteralPath $Verified -File).Count -ne $Metadata.package.published_asset_suffixes.Count) {
     throw 'Replica comparator did not emit the exact verified asset inventory.'
 }
+$Report = Get-Content -LiteralPath (Join-Path $Verified 'terminal-video-player-v0.1.1-reproducibility.json') -Raw | ConvertFrom-Json
+if ($Report.result -cne 'bit-for-bit-identical' -or $Report.comparedAssetCount -ne $ReplicaSuffixes.Count -or
+    $Report.hostedRunner.replicaA.image_version -cne '1' -or $Report.hostedRunner.replicaB.image_version -cne '2') {
+    throw 'Replica comparator did not preserve exact hosted-runner provenance separately.'
+}
 
-$Changed = Join-Path $B "terminal-video-player-v0.1.1$($Metadata.package.published_asset_suffixes[0])"
+$Changed = Join-Path $B "terminal-video-player-v0.1.1$($ReplicaSuffixes[0])"
 Add-Content -LiteralPath $Changed -Value 'difference'
 $Rejected = $false
 try {
     & $Program -MetadataPath (Join-Path $RepoRoot 'third-party\ffmpeg-artifact.json') `
-        -Version '0.1.1' -ReplicaA $A -ReplicaB $B -OutputDirectory (Join-Path $Root 'rejected')
+        -Version '0.1.1' -ReplicaA $A -ReplicaB $B -RunnerMetadataA $RunnerA `
+        -RunnerMetadataB $RunnerB -OutputDirectory (Join-Path $Root 'rejected')
 } catch {
     $Rejected = $true
 }

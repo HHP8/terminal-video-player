@@ -25,6 +25,11 @@ The resulting executables import only allowlisted Windows system DLLs and UCRT
 API-set forwarders. This includes the console and internal UCRT API-set
 contracts `api-ms-win-crt-conio-l1-1-0.dll` and
 `api-ms-win-crt-private-l1-1-0.dll`; no redistributable runtime DLL is bundled.
+The portable archive records the requested `windows-2025` runner label and
+stable runner properties. Because GitHub does not expose an immutable hosted-
+image selector, the exact resolved image metadata from both isolated player
+builds is kept outside the reproducible payload and published in the release's
+reproducibility report.
 
 Configuration starts with `--disable-everything`. It disables autodetection,
 network access, shared libraries, documentation, debug information, and x86

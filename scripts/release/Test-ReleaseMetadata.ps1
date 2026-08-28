@@ -140,6 +140,12 @@ foreach ($Prefix in @($Metadata.package.runtime_prefixes)) {
     }
 }
 Assert-SortedUniqueStrings @($Metadata.package.published_asset_suffixes) 'Published asset suffixes'
+Assert-SortedUniqueStrings @($Metadata.package.generated_asset_suffixes) 'Generated asset suffixes'
+foreach ($Suffix in @($Metadata.package.generated_asset_suffixes)) {
+    if ($Suffix -notin @($Metadata.package.published_asset_suffixes)) {
+        throw "Generated asset suffix is absent from the publication inventory: $Suffix"
+    }
+}
 
 if ($Components.schema -ne 1) { throw 'FFmpeg component schema must equal 1.' }
 Assert-ExactProperties $Components @(
